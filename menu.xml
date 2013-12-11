@@ -1,0 +1,18 @@
+<menu>
+  <item>
+    <path>civicrm/import/ocr</path>
+    <title>OCR File Import</title>
+    <page_callback>CustomImport_OCR_Controller</page_callback>
+    <page_arguments></page_arguments>
+    <access_arguments>administer CiviCRM</access_arguments>
+    <adminGroup>CiviReport</adminGroup>
+  </item>
+  <item>
+    <path>civicrm/export/ocr</path>
+    <title>OCR File Export</title>
+    <page_callback>CustomExport_OCR_Export_Form</page_callback>
+    <page_arguments></page_arguments>
+    <access_arguments>administer CiviCRM</access_arguments>
+    <adminGroup>CiviReport</adminGroup>
+  </item>
+</menu>

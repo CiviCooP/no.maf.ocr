@@ -1,0 +1,15 @@
+/* Additional css for ocr import */
+.crm-container .crm-form-block { background-color:#e6e6e6; }
+#crm-container .report td { border:1px solid #bbb; }
+table.report td { height:27px; }
+
+.report-icon    { width:27px; }
+.report-message { width:600px; }
+.report-message { padding:10px 0 10px 0; }
+
+.report-warning { background:url(images/dialog_warning.png) center center no-repeat; }
+.report-error   { background:url(images/dialog_error.png) center center no-repeat; }
+.report-ok      { background:url(images/dialog_ok.png) center center no-repeat; }
+
+.overview-ok      { background:url(images/traffic_light_green.png) center center no-repeat; }
+.overview-warning { background:url(images/traffic_light_yellow.png) center center no-repeat; }
