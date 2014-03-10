@@ -173,12 +173,20 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                 
                 // 15 digit kid number ..
                 case 15:
-                    // delegate to import_from_contribution_recur function(s)
-                    // nb: there is now a different one for historic contribution recurs
-                    if (((int)substr($record['kid'], 6, 8)) < MAF_HISTORIC_CUTOFF_ID)
-                        $this->import_from_historic_contribution_recur($record);
-                    else
+                    //temp for test
+                    if ($record['kid'] == '029887005437287') {
+                        $record['kid'] = "029042000767383";
                         $this->import_from_contribution_recur($record);
+                    } else {
+
+
+                        // delegate to import_from_contribution_recur function(s)
+                        // nb: there is now a different one for historic contribution recurs
+                        if (((int)substr($record['kid'], 6, 8)) < MAF_HISTORIC_CUTOFF_ID)                           
+                            $this->import_from_historic_contribution_recur($record);
+                        else
+                            $this->import_from_contribution_recur($record);
+                    }
                     break;
 
                 default:
@@ -803,7 +811,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
 
         $contribution = reset($result['values']);
 		
-		if (!isset($contribution['id']) || !$contribution['id']) {
+        if (!isset($contribution['id']) || !$contribution['id']) {
 			$message = ts(
                 "Failed looking up contribution for KID number '%1' at line %2",
                 array(
@@ -816,18 +824,33 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                 $this->createFailureTableEntry($record, $message);
 
             return;
-		}
+        }
             
         if ($test) {
+            /*
+             * BOS1403275 message depending on contribution status:
+             * - if pending, match message
+             * - if other, match and create
+             */
+            if ($contribution['contribution_status_id'] == 2) {
+                $warningMessage = ts(
+                    "Matched KID number '%1' with pending contribution (id %2) at line %3",
+                    array(
+                        1 => $record['kid'],
+                        2 => $contribution['id'],
+                        3 => $record['line_no']
+                    ));
+            } else {
+                $warningMessage = ts(
+                    "KID number '%1' found in existing but not pending contribution (id %2), new contribution will be created and matched for line %3",
+                    array(
+                        1 => $record['kid'],
+                        2 => $contribution['id'],
+                        3 => $record['line_no']
+                    ));
+            }
             // in test mode, let user know a contribution was matched, but do not update
-            $this->addReportLine('ok', ts(
-                "Matched KID number '%1' with pending contribution (id %2) at line %3",
-                array(
-                    1 => $record['kid'],
-                    2 => $contribution['id'],
-                    3 => $record['line_no']
-                )
-            ));
+            $this->addReportLine('ok', $warningMessage);
 
         } else {
 
@@ -837,7 +860,6 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             $nets_date = $this->convertNETSDate($record['nets_date']);
 
             $params = array(
-                'id'                     => $contribution['id'],
                 'total_amount'           => $record['amount'] / 100,
                 'financial_type_id'      => 1, 
                 'contact_id'             => $contribution['contact_id'],
@@ -846,6 +868,15 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                 'source'                 => 'NETS',
                 'contribution_status_id' => $status_id['Completed']
             );
+            
+            /*
+             * BOS1403275 only add contribution['id'] to param list
+             * if status was pending so contribution is updated.
+             * In all other cases, add a new contribution to match with
+             */
+            if ($contribution['contribution_status_id'] == 2) {
+                $params['id'] = $contribution['id'];
+            }
 
             if ($payment_instrument_id)
                 $params['payment_instrument_id'] = $payment_instrument_id;
