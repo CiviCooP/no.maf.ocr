@@ -173,20 +173,12 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                 
                 // 15 digit kid number ..
                 case 15:
-                    //temp for test
-                    if ($record['kid'] == '029887005437287') {
-                        $record['kid'] = "029042000767383";
+                    // delegate to import_from_contribution_recur function(s)
+                    // nb: there is now a different one for historic contribution recurs
+                    if (((int)substr($record['kid'], 6, 8)) < MAF_HISTORIC_CUTOFF_ID)                           
+                        $this->import_from_historic_contribution_recur($record);
+                    else
                         $this->import_from_contribution_recur($record);
-                    } else {
-
-
-                        // delegate to import_from_contribution_recur function(s)
-                        // nb: there is now a different one for historic contribution recurs
-                        if (((int)substr($record['kid'], 6, 8)) < MAF_HISTORIC_CUTOFF_ID)                           
-                            $this->import_from_historic_contribution_recur($record);
-                        else
-                            $this->import_from_contribution_recur($record);
-                    }
                     break;
 
                 default:
