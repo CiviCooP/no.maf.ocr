@@ -20,6 +20,10 @@ class OCRExport {
     protected $start_date = null;
     protected $end_date   = null;
     protected $debug      = false;
+    /*
+     * BOS1403431 protected $memberFinTypeId
+     */
+    protected $memberFinTypeId = 0;
 
     // define the export
     public function __construct($params) {
@@ -40,6 +44,23 @@ class OCRExport {
             $date->modify('+1 month');    // = 15th of the month after
             $this->end_date = $date->format('c');
         }
+        /*
+         * BOS1403431 retrieve and store financial type for Medlem
+         * throw fatal error if not found, export can not proceed if there
+         * is no Medlem financial type
+         */
+        $finTypeParams = array(
+            'name'  =>  "Medlem",
+            'return'=>  "id"
+        );
+        try {
+            $finTypeId = civicrm_api3('FinancialType', 'Getvalue', $finTypeParams);
+            $this->memberFinTypeId = $finTypeId;
+        } catch (CiviCRM_API3_Exception $e) {
+            CRM_Core_Error::fatal(ts("Could not find a valid financial type for Medlem, 
+            error from API entity FinancialType, action Getvalue is : ".$e->getMessage()));
+        }
+        // end BOS1403431
 
     }
 
@@ -216,7 +237,14 @@ class OCRExport {
             $contribution['notification'] == 1 ? $transaction_type = '21' : $transaction_type = '02';
 
             $abbreviated_name = str_pad($first_name . $last_name, 10); // First five letters of first name + first five letters of last name, 0 padded to 10
-            $external_ref     = str_pad('MAF Norge', 25);  // Who are they giving money to?
+            /*
+             * BOS1403431 external_ref has to contain 'Medlemskap' if for membership
+             */
+            if ($contribution['financial_type_id'] == $this->memberFinTypeId) {
+                $external_ref = str_pad('Medlemskap', 25);
+            } else { 
+                $external_ref     = str_pad('MAF Norge', 25);  // Who are they giving money to?
+            }
 
             $lines[] = implode('', array(
                 'NY',              // pos 1-2:   format code        - alphanumeric - always NY
@@ -393,7 +421,14 @@ class OCRExport {
 
                 $transaction_type = '93';
                 $abbreviated_name = str_pad($first_name . $last_name, 10); // First five letters of first name + first five letters of last name, 0 padded to 10
-                $external_ref     = str_pad('MAF Norge', 25);  // Who are they giving money to?
+                /*
+                 * BOS1403431 external_ref has to contain 'Medlemskap' if for membership
+                 */
+                if ($contribution['financial_type_id'] == $this->memberFinTypeId) {
+                    $external_ref = str_pad('Medlemskap', 25);
+                } else { 
+                    $external_ref     = str_pad('MAF Norge', 25);  // Who are they giving money to?
+                }
 
                 $lines[] = implode('', array(
                     'NY',              // pos 1-2:   format code        - alphanumeric - always NY
@@ -543,7 +578,8 @@ class OCRExport {
         // And then get the right payment_type_id for 'Avtale Giro'
         $payment_id = 2;
 
-        // todo: limit to certain financial types
+        // todo: limit to certain financial 
+        
         $dao = CRM_Core_DAO::executeQuery("
             SELECT contact.first_name, contact.last_name, ccr.notification_for_bank, contribution.* FROM civicrm_contribution contribution
         INNER JOIN civicrm_contact contact ON contribution.contact_id = contact.id
@@ -573,7 +609,52 @@ class OCRExport {
             $results[] = $result;
 
         }
-
+        /*
+         * BOS1403431 add pending contributions that are linked to a membership 
+         * (financial_type = Medlem) and have a payment_instrument AvtaleGiro
+         * and are in the selected period
+         */
+        $optionGroupParams = array(
+            'name'      =>  "payment_instrument",
+            'return'    =>  "id"
+        );
+        try {
+            $optionGroupId = civicrm_api3('OptionGroup', 'Getvalue', $optionGroupParams);
+        } catch (CiviCRM_API3_Exception $e) {
+            CRM_Core_Error::fatal(ts("Could not find a valid option group for payment_instrument, 
+            error from API entity OptionGroup, action Getvalue is : ".$e->getMessage()));
+        }
+        $paymentInstrumentParams = array(
+            'option_group_id'   =>  $optionGroupId,
+            'name'              =>  "AvtaleGiro",
+            'return'            =>  "value"
+        );
+        try {
+            $paymentInstrumentId = civicrm_api3('OptionValue', 'Getvalue', $paymentInstrumentParams);
+        } catch (CiviCRM_API3_Exception $e) {
+            CRM_Core_Error::fatal(ts("Could not find a valid option value for payment instrument AvtaleGiro, 
+            error from API entity OptionValue, action Getvalue is : ".$e->getMessage()));
+        }
+  
+        $memberQuery = "
+            SELECT b.first_name, b.last_name, a.* FROM civicrm_contribution a
+            INNER JOIN civicrm_contact b ON a.contact_id = b.id
+            WHERE a.receive_date BETWEEN '{$this->start_date}' AND '{$this->end_date}'
+            AND a.contribution_status_id = $status_id
+            AND a.financial_type_id = {$this->memberFinTypeId}
+            AND a.payment_instrument_id = $paymentInstrumentId";
+        $daoMember = CRM_Core_DAO::executeQuery($memberQuery);
+        while ($daoMember->fetch()) {
+            $result = array();
+            foreach ($fields as $field) {
+                $result[$field] = $daoMember->$field;
+            }
+            $result['first_name'] = $daoMember->first_name;
+            $result['last_name'] = $daoMember->last_name;
+            $result['notification'] = 0;
+            $results[] = $result;
+        }
+        // end BOS1403431
         return $results;
     }
 
