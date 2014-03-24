@@ -6,6 +6,13 @@
  *
  * Distributed under the GNU Affero General Public License, version 3
  * http://www.gnu.org/licenses/agpl-3.0.html 
+ * 
+ *---------------------------------------------------------------------- 
+ * BOS1403820 Process weekly updates with payment method from bank and
+ *            notification to bank
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 24 Mar 2014
+ *----------------------------------------------------------------------
  */
 
 //require_once 'CRM/Import/Parser.php';
@@ -141,6 +148,68 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
 
         $table        = $this->db_table;
         $table_global = $table . '_global';
+        /*
+         * BOS1403820 table for weekly processing
+         * read and process all records from $table_weekly
+         */
+        $table_weekly = $table.'_weekly';
+        $daoWeekly = CRM_Core_DAO::executeQuery('SELECT * FROM '.$table_weekly);
+        while ($daoWeekly->fetch()) {
+            /*
+             * first retrieve id from civicrm_contribution_recur using contact_id
+             * then update civicrm_contribution_recur_offline
+             */
+            $recurQuery = "SELECT id FROM civicrm_contribution_recur
+                WHERE contact_id = ".$daoWeekly->donor_number;
+            $daoRecur = CRM_Core_DAO::executeQuery($recurQuery);
+            /*
+             * error if no records
+             */
+            if ($daoRecur->N == 0) {
+                $warningMessage = "Could not find a recurring contribution for contact ";
+                $warningMessage .= $daoWeekly->donor_number.", please manually change";
+                $warningMessage .= " to betalingsType ".$daoWeekly->betalings_type;
+                $warningMessage .= " and notification to bank ".$daoWeekly->notification_bank;
+                $this->addReportLine('warning', ts($warningMessage));
+            } else {
+                while ($daoRecur->fetch()) {
+                    if (empty($daoRecur->id)) {
+                        $warningMessage = "Could not find a recurring contribution for contact ";
+                        $warningMessage .= $daoWeekly->donor_number.", please manually change";
+                        $warningMessage .= " to betalingsType ".$daoWeekly->betalings_type;
+                        $warningMessage .= " and notification to bank ".$daoWeekly->notification_bank;
+                        $this->addReportLine('warning', ts($warningMessage));
+                    } else {
+                        $updateFields = array();
+                        if ($daoWeekly->notification_bank == "Yes") {
+                            $updateFields[] = "notification_for_bank = 1";
+                        } else {
+                            $updateFields[] = "notification_for_bank = 0";
+                        }
+                        if ($daoWeekly->betalings_type == "AvtaleGiro") {
+                            $updateFields[] = "payment_type_id = 2";
+                        } elseif ($daoWeekly->betalingstype == "PrintedGiro") {
+                            $updateFields[] = "payment_type_id = 3";
+                        }
+                        if (!empty($updateFields)) {
+                            $updQuery = "UPDATE civicrm_contribution_recur_offline SET ";
+                            $updQuery .= implode(", ", $updateFields);
+                            $updQuery .= " WHERE recur_id = ".$daoRecur->id;
+                            CRM_Core_DAO::executeQuery($updQuery);
+                        }
+                        $successMessage = "Recurring contribution for contact ".$daoWeekly->donor_number;
+                        $successMessage .= " updated with notification is ".$daoWeekly->notification_bank;
+                        if (!empty($daoWeekly->betalings_type)) {
+                            $successMessage .= " and payment type is ".$daoWeekly->betalings_type;
+                        }
+                        $this->addReportLine('ok', ts($successMessage));
+                    }
+                }
+            }
+        }
+        // end BOS1403820
+        
+        
         
         // get all fieldnames on import table
         $fields = $this->getFieldNames();
@@ -225,8 +294,11 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
         if (!$this->test) {
             CRM_Core_DAO::executeQuery("DROP TABLE IF EXISTS $table");
             CRM_Core_DAO::executeQuery("DROP TABLE IF EXISTS $table_global");
-        }
-
+            /*
+             * BOS1403820 table for weekly processing
+             */
+            CRM_Core_DAO::executeQuery("DROP TABLE IF EXISTS $table_weekly");
+        }            
     }
 
     // sub method of import() - handles importing as part of activity-based direct mailing

@@ -6,6 +6,13 @@
  *
  * Distributed under the GNU Affero General Public License, version 3
  * http://www.gnu.org/licenses/agpl-3.0.html 
+ * 
+ *---------------------------------------------------------------------- 
+ * BOS1403820 Process weekly updates with payment method from bank and
+ *            notification to bank
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 24 Mar 2014
+ *----------------------------------------------------------------------
  */
 
 /*
@@ -102,7 +109,6 @@ class CRM_Import_DataSource_OCR extends CRM_Import_DataSource {
 
         $db->query("DROP TABLE IF EXISTS $table");
         $db->query("DROP TABLE IF EXISTS $table_global");
-
         $db->query("        
             CREATE TABLE IF NOT EXISTS $table (
               `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -126,7 +132,23 @@ class CRM_Import_DataSource_OCR extends CRM_Import_DataSource {
               PRIMARY KEY (`id`)
             ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1;
         ");
-
+        /*
+         * BOS1403820 drop and create temp table for weekly processing
+         */
+        $table_weekly = $table.'_weekly';
+        $db->query("DROP TABLE IF EXISTS $table_weekly");
+        $db->query("        
+            CREATE TABLE IF NOT EXISTS $table_weekly (
+              `id` int(11) NOT NULL AUTO_INCREMENT,
+              `transmission_number` varchar(7) NOT NULL,
+              `donor_number` char(6) NOT NULL,
+              `betalings_type` varchar(25) NOT NULL,
+              `notification_bank` varchar(3) NOT NULL,
+              `line_no` int(11) NOT NULL,
+              PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1;
+        ");
+        
         $fileData = str_replace("\r", '', $fileData);
         $fileData = explode("\n", $fileData);
 
@@ -230,6 +252,42 @@ class CRM_Import_DataSource_OCR extends CRM_Import_DataSource {
                     case $getChars(1, 8) == 'NY090088':
                         // ignore for now, may need to grab some data from this line in due course
                         break;
+                    
+                    /*
+                     * BOS1403820 weekly records that determine the 
+                     * 'notification to bank' and 'betalingstype'
+                     */
+                    case $getChars(1, 6) == 'NY2194':
+                        $betalingsType = '';
+                        switch ($getChars(16,16)) {
+                            case 1:
+                                $betalingsType = 'AvtaleGiro';
+                                break;
+                            case 2:
+                                $betalingsType = 'PaperGiro';
+                                break;
+                        }
+                        switch ($getChars(42,42)) {
+                            case "J":
+                                $notificationBank = "Yes";
+                                break;
+                            case "N":
+                                $notificationBank = "No";
+                                break;
+                        }
+                        $donorNumber = trim($getChars(27, 32));
+                        /*
+                         * create weekly record
+                         */
+                        $lineNumber = self::$line_no-1;
+                        $insertWeekly = "INSERT INTO $table_weekly SET
+                            transmission_number = '$transmission_no',
+                            donor_number = '$donorNumber',
+                            betalings_type = '$betalingsType',
+                            notification_bank = '$notificationBank',
+                            line_no = $lineNumber";
+                        CRM_Core_DAO::executeQuery($insertWeekly);
+                        break;
 
                     // end tranmission record
                     case $getChars(1, 8) == 'NY000089':
@@ -242,7 +300,6 @@ class CRM_Import_DataSource_OCR extends CRM_Import_DataSource {
                            )
                         );
                         break;
-
 
                 }
             
