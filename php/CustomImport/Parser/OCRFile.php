@@ -160,26 +160,20 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
              * then update civicrm_contribution_recur_offline
              */
             $recurQuery = "SELECT id FROM civicrm_contribution_recur
-                WHERE contact_id = ".$daoWeekly->donor_number;
+                WHERE contact_id = ".$daoWeekly->donor_number." AND end_date IS NULL";
             $daoRecur = CRM_Core_DAO::executeQuery($recurQuery);
             /*
              * error if no records
              */
             if ($daoRecur->N == 0) {
-                $warningMessage = "Could not find a recurring contribution for contact ";
+                $warningMessage = "Could not find an active recurring contribution for contact ";
                 $warningMessage .= $daoWeekly->donor_number.", please manually change";
                 $warningMessage .= " to betalingsType ".$daoWeekly->betalings_type;
                 $warningMessage .= " and notification to bank ".$daoWeekly->notification_bank;
                 $this->addReportLine('warning', ts($warningMessage));
             } else {
                 while ($daoRecur->fetch()) {
-                    if (empty($daoRecur->id)) {
-                        $warningMessage = "Could not find a recurring contribution for contact ";
-                        $warningMessage .= $daoWeekly->donor_number.", please manually change";
-                        $warningMessage .= " to betalingsType ".$daoWeekly->betalings_type;
-                        $warningMessage .= " and notification to bank ".$daoWeekly->notification_bank;
-                        $this->addReportLine('warning', ts($warningMessage));
-                    } else {
+                    if (!$this->test) {
                         $updateFields = array();
                         if ($daoWeekly->notification_bank == "Yes") {
                             $updateFields[] = "notification_for_bank = 1";
@@ -197,13 +191,13 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                             $updQuery .= " WHERE recur_id = ".$daoRecur->id;
                             CRM_Core_DAO::executeQuery($updQuery);
                         }
-                        $successMessage = "Recurring contribution for contact ".$daoWeekly->donor_number;
-                        $successMessage .= " updated with notification is ".$daoWeekly->notification_bank;
-                        if (!empty($daoWeekly->betalings_type)) {
-                            $successMessage .= " and payment type is ".$daoWeekly->betalings_type;
-                        }
-                        $this->addReportLine('ok', ts($successMessage));
                     }
+                    $successMessage = "Recurring contribution for contact ".$daoWeekly->donor_number;
+                    $successMessage .= " updated with notification is ".$daoWeekly->notification_bank;
+                    if (!empty($daoWeekly->betalings_type)) {
+                        $successMessage .= " and payment type is ".$daoWeekly->betalings_type;
+                    }
+                    $this->addReportLine('ok', ts($successMessage));
                 }
             }
         }
