@@ -13,6 +13,10 @@
  * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
  * @date 24 Mar 2014
  *----------------------------------------------------------------------
+ * BOS1312346 Add earmark to contribution for 9 digit KID import
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 1 Apr 2014
+ *----------------------------------------------------------------------
  */
 
 //require_once 'CRM/Import/Parser.php';
@@ -148,6 +152,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
 
         $table        = $this->db_table;
         $table_global = $table . '_global';
+        
         /*
          * BOS1403820 table for weekly processing
          * read and process all records from $table_weekly
@@ -413,7 +418,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             ));
             
         } else {
-
+            
             // create contribution linked to the activity
             $params = array(
                 'total_amount'           => $record['amount'] / 100,
@@ -462,7 +467,6 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                 }
 
             }
-
             try {
                 
                 $result = civicrm_api3('contribution', 'create', $params);
@@ -495,6 +499,12 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                   2 => array($activity_id, 'Positive')
                )
             );
+            /*
+             * BOS1312346 retrieve earmarking from activity and set as default
+             * for contribution in nets transactions custom group
+             */
+            ocr_setActEarmark($activity_id, $contribution['id']);
+            // end BOS1312346
 
             $this->addReportLine('ok', ts(
                 "Successfully created contribution (id: %1) for KID Number '%2' (%3) at line %4",

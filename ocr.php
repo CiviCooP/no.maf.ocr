@@ -395,3 +395,78 @@ function ocr_set_message($message) {
     // Otherwise ..
     return CRM_Utils_System::setUFMessage($message);
 }
+/**
+ * BOS1312346 function to retrieve earmarking_id from matched activity and
+ * set the values in the nets_transactions custom group
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 1 Apr 2014
+ * @param int $activityId
+ * @param int $contributionId
+ * @return void
+ */
+function ocr_setActEarmark($activityId, $contributionId) {
+    if (empty($activityId) || empty($contributionId)) {
+        return;
+    }
+    try {
+        $kidEarmarkCustomGroup = civicrm_api3('CustomGroup', 'Getsingle', array('name' => 'kid_earmark'));
+    } catch (CiviCRM_API3_Exception $e) {
+        throw new CiviCRM_API3_Exception('Could not retrieve custom group with '
+            . 'name kid_earmark, configuration is incorrect. Error message from '
+            . 'API CustomGroup Getsingle: '.$e->getMessage());
+    }
+    if (isset($kidEarmarkCustomGroup['id'])) {
+        $kidEarmarkGroupId = $kidEarmarkCustomGroup['id'];
+    }
+    if (isset($kidEarmarkCustomGroup['table_name'])) {
+        $kidEarmarkTable = $kidEarmarkCustomGroup['table_name'];
+    }
+    $kidEarmarkFieldParams = array(
+        'custom_group_id'   =>  $kidEarmarkGroupId,
+        'name'              =>  'earmarking',
+        'return'            =>  'column_name'
+    );
+    try {
+        $kidEarmarkColumn = civicrm_api3('CustomField', 'Getvalue', $kidEarmarkFieldParams);
+    } catch (CiviCRM_API3_Exception $e) {
+        throw new CiviCRM_API3_Exception('Could not retrieve custom field with '
+            . 'name earmarking in custom group '.$kidEarmarkGroupId.', configuration '
+            . 'is incorrect. Error message from API CustomField Getvalue: '.$e->getMessage());
+    }
+    $kidEarmarkSql = 'SELECT '.$kidEarmarkColumn.' FROM '.$kidEarmarkTable.' '
+        . 'WHERE entity_id = '.$activityId;
+    $daoKidEarmark = CRM_Core_DAO::executeQuery($kidEarmarkSql);
+    if ($daoKidEarmark->fetch()) {
+        $netsGroupParams = array(
+            'name'  =>  'nets_transactions',
+            'return'=>  'table_name'
+        );
+        try {
+            $netsGroupTable = civicrm_api3('CustomGroup', 'Getvalue', $netsGroupParams);
+        } catch (CiviCRM_API3_Exception $e) {
+            throw new CiviCRM_API3_Exception('Could not find custom group with name
+                nets_transactions, configuration is incorrect. Error message 
+                from API CustomGroup Getvalue :'.$e->getMessage());
+        }
+        $earMarkingField = _recurring_getNetsField('earmarking');
+        $balanseKontoField = _recurring_getNetsField('balansekonto');
+        $netsSql = 'REPLACE INTO '.$netsGroupTable.' (entity_id, '.$earMarkingField.', '.
+            $balanseKontoField.') VALUES(%1, %2, %3)';
+        $netsParams = array(
+            1 => array($contributionId, 'Integer'),
+            2 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
+            3 => array(1920, 'Integer')
+        );
+        CRM_Core_DAO::executeQuery($netsSql, $netsParams);
+        /*
+         * update financial type id on contribution based on earmarking
+         */
+        $finTypeId = _recurring_getFinType($daoKidEarmark->$kidEarmarkColumn);
+        CRM_Core_DAO::executeQuery('UPDATE civicrm_contribution SET financial_type_id = '
+                . '%1 WHERE id = %2', array(
+                    1 => array($finTypeId, 'Integer'),
+                    2 => array($contributionId, 'Integer')
+                ));
+    }
+}

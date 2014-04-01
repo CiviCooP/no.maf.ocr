@@ -563,7 +563,7 @@ class OCRExport {
 
         $fields  = array();
         $results = array();
-
+        
         // get all field names on civicrm_contribution - this allows us to extract
         // only the information we need from the dao following a SELECT * FROM,
         // omitting all the other crap it contains.
@@ -579,7 +579,6 @@ class OCRExport {
         $payment_id = 2;
 
         // todo: limit to certain financial 
-        
         $dao = CRM_Core_DAO::executeQuery("
             SELECT contact.first_name, contact.last_name, ccr.notification_for_bank, contribution.* FROM civicrm_contribution contribution
         INNER JOIN civicrm_contact contact ON contribution.contact_id = contact.id
