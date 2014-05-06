@@ -577,6 +577,12 @@ class OCRExport {
 
         // And then get the right payment_type_id for 'Avtale Giro'
         $payment_id = 2;
+        CRM_Core_Error::debug('start_date', $this->start_date);
+        CRM_Core_Error::debug('end_date', $this->end_date);
+        CRM_Core_Error::debug('status_id', $status_id);
+        CRM_Core_Error::debug('payment_id', $payment_id);
+        exit();
+        
 
         // todo: limit to certain financial 
         $dao = CRM_Core_DAO::executeQuery("

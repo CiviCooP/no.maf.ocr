@@ -20,43 +20,40 @@ define('MAF_HISTORIC_CUTOFF_ID', 700000);
 // Include civicrm_api3 wrapper for early 4.3 versions
 if (!class_exists('CiviCRM_API3_Exception')) {
     
-    class CiviCRM_API3_Exception extends Exception {
+  class CiviCRM_API3_Exception extends Exception {
       
-        private $extraParams = array();
+    private $extraParams = array();
 
-        public function __construct($message, $error_code, $extraParams = array(),Exception $previous = null) {  
-            parent::__construct(ts($message));
-            $this->extraParams = $extraParams + array('error_code' => $error_code);
-        }
-
-        // custom string representation of object
-        public function __toString() {
-            return __CLASS__ . ": [{$this->extraParams['error_code']}: {$this->message}\n";
-        }
-
-        public function getErrorCode() {
-            return $this->extraParams['error_code'];
-        }
-
-        public function getExtraParams() {
-            return $this->extraParams;
-        }
-
+    public function __construct($message, $error_code, $extraParams = array(),Exception $previous = null) {  
+      parent::__construct(ts($message));
+      $this->extraParams = $extraParams + array('error_code' => $error_code);
     }
 
+    // custom string representation of object
+    public function __toString() {
+      return __CLASS__ . ": [{$this->extraParams['error_code']}: {$this->message}\n";
+    }
+
+    public function getErrorCode() {
+      return $this->extraParams['error_code'];
+    }
+
+    public function getExtraParams() {
+      return $this->extraParams;
+    }
+  }
 }
 
 if (!function_exists('civicrm_api3')) {
     
-    function civicrm_api3($entity, $action, $params = array()) {
-        $params['version'] = 3;
-        $result = civicrm_api($entity, $action, $params);
-        if(is_array($result) && !empty($result['is_error'])){
-            throw new CiviCRM_API3_Exception($result['error_message'], CRM_Utils_Array::value('error_code', $result, 'undefined'), $result);
-        }
-        return $result;
+  function civicrm_api3($entity, $action, $params = array()) {
+    $params['version'] = 3;
+    $result = civicrm_api($entity, $action, $params);
+    if(is_array($result) && !empty($result['is_error'])){
+      throw new CiviCRM_API3_Exception($result['error_message'], CRM_Utils_Array::value('error_code', $result, 'undefined'), $result);
     }
-
+    return $result;
+  }
 }
 
 /*
@@ -64,18 +61,18 @@ if (!function_exists('civicrm_api3')) {
  */
 function ocr_civicrm_buildForm($formName, &$form) {
     
-    switch ($formName) {
+  switch ($formName) {
         
-        // Add activity selection list to add/edit Contribution form
-        case 'CRM_Contribute_Form_Contribution':
+    // Add activity selection list to add/edit Contribution form
+    case 'CRM_Contribute_Form_Contribution':
         
-            $contact_id      = @$_POST['contact_id'] or $contact_id = @$_GET['cid'];
-            $contribution_id = @$_GET['id'];
-            
-            if (!$contact_id)
-                return;
+      $contact_id      = @$_POST['contact_id'] or $contact_id = @$_GET['cid'];
+      $contribution_id = @$_GET['id'];
+   
+      if (!$contact_id)
+        return;
 
-            $activities = array(0 => ts('Select...')) 
+      $activities = array(0 => ts('Select...')) 
                 + ocr_get_activities_for_contact($contact_id);
 
             $form->add('select', 'ocr_activity', ts('Linked to Activity'), $activities, false);
@@ -135,6 +132,12 @@ function ocr_civicrm_disable() {
 }
 
 function ocr_civicrm_enable() {
+  /*
+   * BOS1405148 assumes custom_group with name fin_type_group exists
+   * and populates defined option values with financial types in CiviCRM
+   */
+  ocr_set_fin_types();
+  // end BOS1405148
     
     if (ocr_dependency_check())
         ocr_navigation_build();
@@ -405,7 +408,7 @@ function ocr_set_message($message) {
  * @param int $contributionId
  * @return void
  */
-function ocr_setActEarmark($activityId, $contributionId) {
+function ocr_set_act_earmark($activityId, $contributionId) {
     if (empty($activityId) || empty($contributionId)) {
         return;
     }
@@ -469,4 +472,76 @@ function ocr_setActEarmark($activityId, $contributionId) {
                     2 => array($contributionId, 'Integer')
                 ));
     }
+}
+/**
+ * Function to set the option values for fin type group
+ * BOS1405148
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 6 May 2014
+ */
+function ocr_set_fin_types() {
+  require_once 'php/CRM/OcrConfig.php';
+  try {
+    $finTypes = civicrm_api3('FinancialType', 'Get', array('is_active' => 1));
+  } catch (CiviCRM_API3_Exception $ex) {
+    $finTypes = array();
+  }
+  if (!empty($finTypes)) {
+    $ocrConfig = php_CRM_OcrConfig::singleton();
+    $customFieldParams = array(
+      'custom_group_id' =>  $ocrConfig->finTypeGroupId,
+      'name'            =>  $ocrConfig->finTypeFieldName,
+      'return'          =>  'option_group_id'
+    );
+    $finTypeOptionGroupId = civicrm_api3('CustomField', 'Getvalue', $customFieldParams);
+    /*
+     * remove all existing option values (directly in database because\
+     * API would force me to do record by record
+     */
+    $delQuery = "DELETE FROM civicrm_option_value WHERE option_group_id = %1";
+    $delParams = array(1 => array($finTypeOptionGroupId, 'Integer'));
+    CRM_Core_DAO::executeQuery($delQuery, $delParams);
+    
+    /*
+     * create first option value for - none option
+     */
+    $noneParams = array(
+      'option_group_id'   =>  $finTypeOptionGroupId,
+      'value'             =>  0,
+      'label'             =>  '- none',
+      'is_active'         =>  1,
+      'is_reserved'       =>  1
+    );
+    civicrm_api3('OptionValue', 'Create', $noneParams);
+    foreach ($finTypes['values'] as $finTypeId => $finType) {
+      $createParams = array(
+        'option_group_id'   =>  $finTypeOptionGroupId,
+        'value'             =>  $finTypeId,
+        'label'             =>  $finType['name'],
+        'is_active'         =>  1,
+        'is_reserved'       =>  1
+      );
+      civicrm_api3('OptionValue', 'Create', $createParams);
+    }
+  }
+}
+/**
+ * Function to retrieve the fin type to be used as a default for a contact
+ * (BOS1405148)
+ * Careful!!! This function is also called from the no.maf.recurring extension!
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 6 May 2014
+ * @param int $contactId
+ * @return int $finTypeId
+ */
+function ocr_retrieve_fin_type_contact($contactId) {
+  $ocrConfig = php_CRM_OcrConfig::singleton();
+  if (empty($contactId)) {
+    $finTypeId = $ocrConfig->defaultFinTypeId;
+  } else {
+    $contactGroups = CRM_Contact_BAO_GroupContact($contactId);
+  }
+  return $finTypeId;
 }

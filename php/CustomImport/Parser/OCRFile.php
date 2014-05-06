@@ -503,7 +503,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
              * BOS1312346 retrieve earmarking from activity and set as default
              * for contribution in nets transactions custom group
              */
-            ocr_setActEarmark($activity_id, $contribution['id']);
+            ocr_set_act_earmark($activity_id, $contribution['id']);
             // end BOS1312346
 
             $this->addReportLine('ok', ts(
