@@ -22,6 +22,9 @@
  | GNU Affero General Public License or the licensing of CiviCRM,     |
  | see the CiviCRM license FAQ at http://civicrm.org/licensing        |
  +--------------------------------------------------------------------+
+ | BOS1405148 rename group to Linked Activity  (5 Jun 2014)           |
+ | Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>                  |
+ +--------------------------------------------------------------------+
 *}
 {* this template is used for adding/editing/deleting contributions and pledge payments *}
 
@@ -329,9 +332,14 @@
 
   {* Customized - andyw@circle, 01/10/2013 *}
   {* Provide fieldset for linking to Activity - OCR Import/Export extension *}
+  
     <div class="crm-accordion-wrapper crm-accordion_title-accordion crm-accordion-processed" id="paymentDetails_Information">
       <div class="crm-accordion-header">
-        {ts}OCR Import/Export{/ts}
+        {* BOS1405148 - Erik Hommel (CiviCooP - <erik.hommel@civicoop.org> change name to Linked Activity *}  
+        {*{ts}OCR Import/Export{/ts}*}
+        {ts}Linked Activity{/ts}
+        {* end BOS1405148 *}
+        
       </div>
       <div class="crm-accordion-body">
         <table class="form-layout-compressed">
