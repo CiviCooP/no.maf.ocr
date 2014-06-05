@@ -214,7 +214,8 @@ function ocr_process_contribution_activity($contributionId, $contactId, $op) {
    * if op = edit, only create record if there is none yet
    */
   if ($op == 'edit') {
-    if (ocr_check_contribution_activity($contributionId) == FALSE) {
+    $checkExists = ocr_check_contribution_activity($contributionId);
+    if ($checkExists == FALSE) {
       $activityId = ocr_get_latest_activity($contactId);
       ocr_create_contribution_activity($contributionId, $activityId);
     }
@@ -261,8 +262,9 @@ function ocr_check_contribution_activity($contributionId) {
   $query = 'SELECT COUNT(*) AS actCount FROM civicrm_contribution_activity WHERE contribution_id = %1';
   $params = array(1 => array($contributionId, 'Positive'));
   $dao = CRM_Core_DAO::executeQuery($query, $params);
+  
   if ($dao->fetch()) {
-    if ($dao->actCount == 0) {
+    if ($dao->actCount > 0) {
       return TRUE;
     }
   }
