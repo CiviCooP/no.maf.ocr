@@ -187,7 +187,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
               }
               if ($daoWeekly->betalings_type == "AvtaleGiro") {
                 $updateFields[] = "payment_type_id = 2";
-              } elseif ($daoWeekly->betalingstype == "PrintedGiro") {
+              } elseif ($daoWeekly->betalings_type == "PaperGiro") {
                 $updateFields[] = "payment_type_id = 3";
               }
               if (!empty($updateFields)) {
