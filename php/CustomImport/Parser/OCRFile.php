@@ -153,60 +153,60 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
         $table        = $this->db_table;
         $table_global = $table . '_global';
         
+      /*
+       * BOS1403820 table for weekly processing
+       * read and process all records from $table_weekly
+       */
+      $table_weekly = $table.'_weekly';
+      $daoWeekly = CRM_Core_DAO::executeQuery('SELECT * FROM '.$table_weekly);
+      while ($daoWeekly->fetch()) {
         /*
-         * BOS1403820 table for weekly processing
-         * read and process all records from $table_weekly
+         * first retrieve id from civicrm_contribution_recur using contact_id
+         * then update civicrm_contribution_recur_offline
          */
-        $table_weekly = $table.'_weekly';
-        $daoWeekly = CRM_Core_DAO::executeQuery('SELECT * FROM '.$table_weekly);
-        while ($daoWeekly->fetch()) {
-            /*
-             * first retrieve id from civicrm_contribution_recur using contact_id
-             * then update civicrm_contribution_recur_offline
-             */
-            $recurQuery = "SELECT id FROM civicrm_contribution_recur
-                WHERE contact_id = ".$daoWeekly->donor_number." AND end_date IS NULL";
-            $daoRecur = CRM_Core_DAO::executeQuery($recurQuery);
-            /*
-             * error if no records
-             */
-            if ($daoRecur->N == 0) {
-                $warningMessage = "Could not find an active recurring contribution for contact ";
-                $warningMessage .= $daoWeekly->donor_number.", please manually change";
-                $warningMessage .= " to betalingsType ".$daoWeekly->betalings_type;
-                $warningMessage .= " and notification to bank ".$daoWeekly->notification_bank;
-                $this->addReportLine('warning', ts($warningMessage));
-            } else {
-                while ($daoRecur->fetch()) {
-                    if (!$this->test) {
-                        $updateFields = array();
-                        if ($daoWeekly->notification_bank == "Yes") {
-                            $updateFields[] = "notification_for_bank = 1";
-                        } else {
-                            $updateFields[] = "notification_for_bank = 0";
-                        }
-                        if ($daoWeekly->betalings_type == "AvtaleGiro") {
-                            $updateFields[] = "payment_type_id = 2";
-                        } elseif ($daoWeekly->betalingstype == "PrintedGiro") {
-                            $updateFields[] = "payment_type_id = 3";
-                        }
-                        if (!empty($updateFields)) {
-                            $updQuery = "UPDATE civicrm_contribution_recur_offline SET ";
-                            $updQuery .= implode(", ", $updateFields);
-                            $updQuery .= " WHERE recur_id = ".$daoRecur->id;
-                            CRM_Core_DAO::executeQuery($updQuery);
-                        }
-                    }
-                    $successMessage = "Recurring contribution for contact ".$daoWeekly->donor_number;
-                    $successMessage .= " updated with notification is ".$daoWeekly->notification_bank;
-                    if (!empty($daoWeekly->betalings_type)) {
-                        $successMessage .= " and payment type is ".$daoWeekly->betalings_type;
-                    }
-                    $this->addReportLine('ok', ts($successMessage));
-                }
+        $recurQuery = "SELECT id FROM civicrm_contribution_recur
+          WHERE contact_id = ".$daoWeekly->donor_number;
+        $daoRecur = CRM_Core_DAO::executeQuery($recurQuery);
+        /*
+         * error if no records
+         */
+        if ($daoRecur->N == 0) {
+          $warningMessage = "Could not find an active recurring contribution for contact ";
+          $warningMessage .= $daoWeekly->donor_number.", please manually change";
+          $warningMessage .= " to betalingsType ".$daoWeekly->betalings_type;
+          $warningMessage .= " and notification to bank ".$daoWeekly->notification_bank;
+          $this->addReportLine('warning', ts($warningMessage));
+        } else {
+          while ($daoRecur->fetch()) {
+            if (!$this->test) {
+              $updateFields = array();
+              if ($daoWeekly->notification_bank == "Yes") {
+                $updateFields[] = "notification_for_bank = 1";
+              } else {
+                $updateFields[] = "notification_for_bank = 0";
+              }
+              if ($daoWeekly->betalings_type == "AvtaleGiro") {
+                $updateFields[] = "payment_type_id = 2";
+              } elseif ($daoWeekly->betalingstype == "PrintedGiro") {
+                $updateFields[] = "payment_type_id = 3";
+              }
+              if (!empty($updateFields)) {
+                $updQuery = "UPDATE civicrm_contribution_recur_offline SET ";
+                $updQuery .= implode(", ", $updateFields);
+                $updQuery .= " WHERE recur_id = ".$daoRecur->id;
+                CRM_Core_DAO::executeQuery($updQuery);
+              }
             }
+            $successMessage = "Recurring contribution for contact ".$daoWeekly->donor_number;
+            $successMessage .= " updated with notification is ".$daoWeekly->notification_bank;
+            if (!empty($daoWeekly->betalings_type)) {
+              $successMessage .= " and payment type is ".$daoWeekly->betalings_type;
+            }
+            $this->addReportLine('ok', ts($successMessage));
+          }
         }
-        // end BOS1403820
+      }
+      // end BOS1403820
         
         
         
