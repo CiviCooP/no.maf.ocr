@@ -206,14 +206,7 @@ function ocr_process_contribution_activity($contributionId, $contactId, $op) {
   /*
    * if op == create, get latest activity for contact and create record
    */
-  if ($op == 'create') {
-    $activityId = ocr_get_latest_activity($contactId);
-    ocr_create_contribution_activity($contributionId, $activityId);
-  }
-  /*
-   * if op = edit, only create record if there is none yet
-   */
-  if ($op == 'edit') {
+  if ($op == 'create' || $op == 'edit') {
     $checkExists = ocr_check_contribution_activity($contributionId);
     if ($checkExists == FALSE) {
       $activityId = ocr_get_latest_activity($contactId);
