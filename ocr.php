@@ -17,6 +17,11 @@ define('NETS_TEST_CUSTOMER_ID_NUMBER', '00076473'); // test file
 
 define('MAF_HISTORIC_CUTOFF_ID', 700000);
 
+/*
+ * BOS1405148 define constant for top level donor journey group
+ */
+define('MAF_DONORJOURNEY_GROUP', 6508);
+
 // Include civicrm_api3 wrapper for early 4.3 versions
 if (!class_exists('CiviCRM_API3_Exception')) {
     
@@ -71,14 +76,11 @@ function ocr_civicrm_buildForm($formName, &$form) {
       }
       $activities = array(0 => ts('Select...')) + ocr_get_activities_for_contact($contact_id);
       $form->add('select', 'ocr_activity', ts('Linked to Activity'), $activities, false);
-      if ($contribution_id) {
-        if ($selected_activity = CRM_Core_DAO::singleValueQuery("
-          SELECT activity_id FROM civicrm_contribution_activity WHERE contribution_id = %1
-          ", array(
-          1 => array($contribution_id, 'Positive')))) {
-          $form->setDefaults(array('ocr_activity' => $selected_activity));
-        }
-      }
+      /*
+       * BOS1405148 - add donor group
+       */
+      $donorGroups = array(0 => ts('Select...')) + ocr_get_donor_groups();
+      $form->add('select', 'donor_group', ts('Donor Group'), $donorGroups, false);
       break;
 
     // Add custom css to the Import Preview and Summary form
@@ -90,6 +92,47 @@ function ocr_civicrm_buildForm($formName, &$form) {
   }
 }
 
+/**
+ * Fuction to retrieve groups in Donor Journey
+ * 
+ */
+function ocr_get_donor_groups() {
+  $groupList = array();
+  /*
+   * retrieve Donor Journey Group children
+   */
+  $parents = array(MAF_DONORJOURNEY_GROUP);
+  $hasChildren = ocr_check_group_has_children($parents);
+  while ($hasChildren == TRUE) {
+    foreach ($parents as $parent) {
+      $groupChildren = civicrm_api3('Group', 'Getvalue', array('id' => $parent, 'return' => 'children'));
+      if (!empty($groupChildren)) {
+        $children = explode(',', $groupChildren);
+        $parents = array();
+        foreach($children as $child) {
+          $parents[] = $child;
+          $groupData = civicrm_api3('Group', 'Getsingle', array('id' => $child));
+          $groupList[$groupData['id']] = $groupData['title'];
+        }
+      }
+    }
+    $hasChildren = ocr_check_group_has_children($parents);
+  }
+  return $groupList;
+}
+/**
+ * Function to check if one of the group parents has children
+ */
+function ocr_check_group_has_children($groupIds) {
+  $hasChildren = FALSE;
+  foreach ($groupIds as $groupId) {
+    $groupChildren = civicrm_api3('Group', 'Getvalue', array('id' => $groupId, 'return' => 'children'));
+    if (!empty($groupChildren)) {
+      $hasChildren = TRUE;
+    }
+  }
+  return $hasChildren;
+}
 /*
  * Implementation of hook_civicrm_config
  */
@@ -127,7 +170,18 @@ function ocr_civicrm_enable() {
     PRIMARY KEY (`contribution_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
   ");
-
+  
+  /*
+   * BOS1405148 create table to record group of donor at time of contribution
+   */
+  CRM_Core_DAO::executeQuery('
+    CREATE TABLE IF NOT EXISTS `civicrm_contribution_donorgroup` (
+    `contribution_id` int(10) unsigned NOT NULL,
+    `group_id` int(10) unsigned NOT NULL,
+    PRIMARY KEY (`contribution_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+  ');
+  
   CRM_Core_DAO::executeQuery("
     CREATE TABLE IF NOT EXISTS `civicrm_failed_kid_numbers` (
     `transmission_number` varchar(7) NOT NULL,
@@ -174,8 +228,8 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   /*
    * BOS1405148
    * set default activity for contribution when status is set
-   * to completed. Defaulted to latest activity of contact (also for edit if 
-   * not set yet)
+   * to completed and linked activity is still empty. Defaulted to latest activity 
+   * of contact (also for edit if not set yet)
    * 
    * Delete record in contribution_activity when contribution is deleted
    */
@@ -186,9 +240,7 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
       CRM_Core_DAO::executeQuery($delQuery, $delParams);
     }
     if ($op == 'create' || $op == 'edit') {
-      if ($objectRef->contribution_status_id == 1) {
-        ocr_process_contribution_activity($objectId, $objectRef->contact_id, $op);
-      }
+      ocr_process_contribution_activity($objectId, $objectRef->contact_id, $op);
     }
   }
 }
@@ -203,15 +255,10 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
  * @param string $op
  */
 function ocr_process_contribution_activity($contributionId, $contactId, $op) {
-  /*
-   * if op == create, get latest activity for contact and create record
-   */
-  if ($op == 'create' || $op == 'edit') {
-    $checkExists = ocr_check_contribution_activity($contributionId);
-    if ($checkExists == FALSE) {
-      $activityId = ocr_get_latest_activity($contactId);
-      ocr_create_contribution_activity($contributionId, $activityId);
-    }
+  $checkExists = ocr_check_contribution_activity($contributionId);
+  if ($checkExists == FALSE) {
+    $activityId = ocr_get_latest_activity($contactId);
+    ocr_create_contribution_activity($contributionId, $activityId);
   }
 }
 /**
