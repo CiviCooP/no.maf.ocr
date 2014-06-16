@@ -483,3 +483,29 @@ function ocr_set_act_earmark($activityId, $contributionId) {
     ));
   }
 }
+/**
+ * Function to create the insert or update query for contribution/activity
+ * (BOS1406389)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 16 Jun 2014
+ * @param int $contributionId
+ * @return string $query 
+ */
+function ocr_contribution_activity_query($contributionId) {
+  $query = '';
+  if (empty($contributionId)) {
+    return $query;
+  }
+  $countQry = 'SELECT COUNT(*) AS countRecords FROM civicrm_contribution_activity WHERE contribution_id = %1';
+  $countDao = CRM_Core_DAO::executeQuery($countQry, array(1 => array($contributionId, 'Positive')));
+  if ($countDao->fetch()) {
+    $query .= ' civicrm_contribution_activity SET contribution_id = %1, activity_id = %2';
+    if ($countDao->countRecord > 0) {
+      $query = 'INSERT INTO '.$query;
+    } else {
+      $query = 'UPDATE '.$query.' WHERE contribution_id = %1';      
+    }
+  }
+  return $query;
+}

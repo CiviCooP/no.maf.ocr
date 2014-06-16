@@ -491,10 +491,11 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             }
             
             $contribution = reset($result['values']);
-            CRM_Core_DAO::singleValueQuery("
-                INSERT INTO civicrm_contribution_activity (contribution_id, activity_id)
-                VALUES (%1, %2)
-            ", array(
+            /*
+             * BOS1406389
+             */
+            $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id);
+            CRM_Core_DAO::singleValueQuery($actQuery, array(
                   1 => array($contribution['id'], 'Positive'),
                   2 => array($activity_id, 'Positive')
                )
@@ -768,11 +769,12 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
 
             $contribution = reset($result['values']);
 
+            /*
+             * BOS1406389
+             */
+            $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id);
             // link to activity
-            CRM_Core_DAO::singleValueQuery("
-                INSERT INTO civicrm_contribution_activity (contribution_id, activity_id)
-                VALUES (%1, %2)
-            ", array(
+            CRM_Core_DAO::singleValueQuery($actQuery, array(
                   1 => array($contribution['id'], 'Positive'),
                   2 => array($activity_id, 'Positive')
                )
