@@ -20,7 +20,7 @@ define('MAF_HISTORIC_CUTOFF_ID', 700000);
 /*
  * BOS1405148 define constant for top level donor journey group
  */
-define('MAF_DONORJOURNEY_GROUP', 6508);
+define('MAF_DONORJOURNEY_GROUP', 6509);
 
 // Include civicrm_api3 wrapper for early 4.3 versions
 if (!class_exists('CiviCRM_API3_Exception')) {
@@ -85,9 +85,11 @@ function ocr_civicrm_buildForm($formName, &$form) {
       /*
        * set defaults for donor_group and linked activity
        */
-      $defaults = ocr_set_contribution_enhanced_defaults($contribution_id);
-      if (!empty($defaults)) {
-        $form->setDefaults($defaults);
+      if (!empty($contribution_id)) {
+        $defaults = ocr_set_contribution_enhanced_defaults($contribution_id);
+        if (!empty($defaults)) {
+          $form->setDefaults($defaults);
+        }
       }
       break;
 
