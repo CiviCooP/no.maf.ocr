@@ -79,8 +79,16 @@ function ocr_civicrm_buildForm($formName, &$form) {
       /*
        * BOS1405148 - add donor group
        */
+      $values = $form->getVar('_values');
       $donorGroups = array(0 => ts('Select...')) + ocr_get_donorgroups();
       $form->add('select', 'donor_group', ts('Donor Group'), $donorGroups, false);
+      /*
+       * set defaults for donor_group and linked activity
+       */
+      $defaults = ocr_set_contribution_enhanced_defaults($contribution_id);
+      if (!empty($defaults)) {
+        $form->setDefaults($defaults);
+      }
       break;
 
     // Add custom css to the Import Preview and Summary form
@@ -89,6 +97,60 @@ function ocr_civicrm_buildForm($formName, &$form) {
     case 'CustomImport_OCR_Form_Summary':
       CRM_Core_Resources::singleton()->addStyleFile('no.maf.ocr', 'css/import.css', CRM_Core_Resources::DEFAULT_WEIGHT, 'html-header');
       break;
+  }
+}
+/**
+ * Function to set the defaults for contribution donorgroup and linked activity
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 17 Jun 2014
+ * @param int $contributionId
+ * @return array $defaults
+ * 
+ */
+function ocr_set_contribution_enhanced_defaults($contributionId) {
+  $defaults = array();
+  ocr_set_default_contribution_activity($contributionId, $defaults);
+  ocr_set_default_contribution_donorgroup($contributionId, $defaults);
+  return $defaults;
+}
+/**
+ * Function to get contribution_activity record and set default when found
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicooporg>
+ * @date 17 Jun 2014
+ * @param int $contributionId
+ * @param array $defaults
+ */
+function ocr_set_default_contribution_activity($contributionId, &$defaults) {
+  $query = 'SELECT activity_id FROM civicrm_contribution_activity WHERE contribution_id = %1';
+  $dao = CRM_Core_DAO::executeQuery($query, array(1 => array($contributionId, 'Positive')));
+  if ($dao->fetch()) {
+    $defaults['ocr_activity'] = $dao->activity_id;
+  }
+}
+/**
+ * Function to get contribution_donorgroup record and set default when found
+ * Set default to donorgroup at receipt date when not found
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicooporg>
+ * @date 17 Jun 2014
+ * @param int $contributionId
+ * @param array $defaults
+ */
+function ocr_set_default_contribution_donorgroup($contributionId, &$defaults) {
+  $query = 'SELECT group_id FROM civicrm_contribution_donorgroup WHERE contribution_id = %1';
+  $dao = CRM_Core_DAO::executeQuery($query, array(1 => array($contributionId, 'Positive')));
+  if ($dao->fetch()) {
+    $defaults['donor_group'] = $dao->group_id;
+  } else {
+    $receiveDate = civicrm_api3('Contribution','Getvalue', array('id' => $contributionId, 'return' => 'receive_date'));
+    if (!empty($receiveDate)) {
+      $defaults['donor_group'] = ocr_get_contribution_donorgroup($contributionId, $receiveDate);
+    }
   }
 }
 /**
@@ -125,6 +187,7 @@ function ocr_get_donorgroups() {
 }
 /**
  * Function to check if one of the group parents has children
+ * (BOS1405148)
  * 
  * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
  * @date 12 Jun 2014
@@ -249,7 +312,7 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
     }
     if ($op == 'create' || $op == 'edit') {
       ocr_process_contribution_activity($objectId, $objectRef->contact_id);
-      ocr_process_contribution_donorgroup($objectId, $objectRef->contact_id, $objectRef->receive_date);
+      ocr_process_contribution_donorgroup($objectId, $objectRef->receive_date);
     }
   }
 }
@@ -260,13 +323,12 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
  * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
  * @date 12 Jun 2014
  * @param int $contributionId
- * @param int $contactId
  * @param date $receiptDate
  */
-function ocr_process_contribution_donorgroup($contributionId, $contactId, $receiptDate) {
+function ocr_process_contribution_donorgroup($contributionId, $receiptDate) {
   $checkExists = ocr_check_contribution_group($contributionId);
   if ($checkExists == FALSE) {
-    $groupId = ocr_get_contact_donorgroup($contactId, $receiptDate);
+    $groupId = ocr_get_contribution_donorgroup($contributionId, $receiptDate);
     ocr_create_contribution_donorgroup($contributionId, $groupId);
   }
 }
@@ -276,12 +338,13 @@ function ocr_process_contribution_donorgroup($contributionId, $contactId, $recei
  * 
  * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
  * @date 17 Jun 2014
- * @param int $contactId
+ * @param array $contribution
  * @param date $receiptDate
  * @return int $groupId
  */
-function ocr_get_contact_donorgroup($contactId, $receiptDate) {
+function ocr_get_contribution_donorgroup($contributionId, $receiptDate) {
   $groupId = 0;
+  $contactId = civicrm_api3('Contribution', 'Getvalue', array('id' => $contributionId, 'return' => 'contact_id'));
   /*
    * get all groups for contact
    */
