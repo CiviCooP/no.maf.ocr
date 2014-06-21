@@ -20,7 +20,7 @@ define('MAF_HISTORIC_CUTOFF_ID', 700000);
 /*
  * BOS1405148 define constant for top level donor journey group
  */
-define('MAF_DONORJOURNEY_GROUP', 6508);
+define('MAF_DONORJOURNEY_GROUP', 6509);
 
 // Include civicrm_api3 wrapper for early 4.3 versions
 if (!class_exists('CiviCRM_API3_Exception')) {
