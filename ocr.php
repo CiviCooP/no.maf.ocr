@@ -17,6 +17,11 @@ define('NETS_TEST_CUSTOMER_ID_NUMBER', '00076473'); // test file
 
 define('MAF_HISTORIC_CUTOFF_ID', 700000);
 
+/*
+ * BOS1405148 define constant for top level donor journey group
+ */
+define('MAF_DONORJOURNEY_GROUP', 6508);
+
 // Include civicrm_api3 wrapper for early 4.3 versions
 if (!class_exists('CiviCRM_API3_Exception')) {
     
@@ -71,13 +76,18 @@ function ocr_civicrm_buildForm($formName, &$form) {
       }
       $activities = array(0 => ts('Select...')) + ocr_get_activities_for_contact($contact_id);
       $form->add('select', 'ocr_activity', ts('Linked to Activity'), $activities, false);
-      if ($contribution_id) {
-        if ($selected_activity = CRM_Core_DAO::singleValueQuery("
-          SELECT activity_id FROM civicrm_contribution_activity WHERE contribution_id = %1
-          ", array(
-          1 => array($contribution_id, 'Positive')))) {
-          $form->setDefaults(array('ocr_activity' => $selected_activity));
-        }
+      /*
+       * BOS1405148 - add donor group
+       */
+      $values = $form->getVar('_values');
+      $donorGroups = array(0 => ts('Select...')) + ocr_get_donorgroups();
+      $form->add('select', 'donor_group', ts('Donor Group'), $donorGroups, false);
+      /*
+       * set defaults for donor_group and linked activity
+       */
+      $defaults = ocr_set_contribution_enhanced_defaults($contribution_id, $contact_id);
+      if (!empty($defaults)) {
+        $form->setDefaults($defaults);
       }
       break;
 
@@ -89,7 +99,121 @@ function ocr_civicrm_buildForm($formName, &$form) {
       break;
   }
 }
-
+/**
+ * Function to set the defaults for contribution donorgroup and linked activity
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 17 Jun 2014
+ * @param int $contributionId
+ * @param int $contactId
+ * @return array $defaults
+ * 
+ */
+function ocr_set_contribution_enhanced_defaults($contributionId, $contactId) {
+  $defaults = array();
+  ocr_set_default_contribution_activity($contributionId, $defaults, $contactId);
+  ocr_set_default_contribution_donorgroup($contributionId, $defaults, $contactId);
+  return $defaults;
+}
+/**
+ * Function to get contribution_activity record and set default when found
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicooporg>
+ * @date 17 Jun 2014
+ * @param int $contributionId
+ * @param array $defaults
+ */
+function ocr_set_default_contribution_activity($contributionId, &$defaults, $contactId) {
+  if (!empty($contributionId)) {
+    $query = 'SELECT activity_id FROM civicrm_contribution_activity WHERE contribution_id = %1';
+    $dao = CRM_Core_DAO::executeQuery($query, array(1 => array($contributionId, 'Positive')));
+    if ($dao->fetch()) {
+      $defaults['ocr_activity'] = $dao->activity_id;
+    }
+  } else {
+    $defaults['ocr_activity'] = ocr_get_latest_activity($contactId);
+  }
+}
+/**
+ * Function to get contribution_donorgroup record and set default when found
+ * Set default to donorgroup at receipt date when not found
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicooporg>
+ * @date 17 Jun 2014
+ * @param int $contributionId
+ * @param int $contactId
+ * @param array $defaults
+ */
+function ocr_set_default_contribution_donorgroup($contributionId, &$defaults, $contactId) {
+  if (!empty($contributionId)) {
+    $query = 'SELECT group_id FROM civicrm_contribution_donorgroup WHERE contribution_id = %1';
+    $dao = CRM_Core_DAO::executeQuery($query, array(1 => array($contributionId, 'Positive')));
+    if ($dao->fetch()) {
+      $defaults['donor_group'] = $dao->group_id;
+    } else {
+      $receiveDate = civicrm_api3('Contribution','Getvalue', array('id' => $contributionId, 'return' => 'receive_date'));
+      if (!empty($receiveDate)) {
+        $defaults['donor_group'] = ocr_get_contribution_donorgroup($contributionId, $receiveDate, $contactId);
+      }
+    }
+  } else {
+    $defaults['donor_group'] = ocr_get_contribution_donorgroup(0, NULL, $contactId);
+  }
+}
+/**
+ * Function to retrieve groups in Donor Journey
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommmel@civicoop.org>
+ * @date 12 Jun 2014
+ * @return array $groupList
+ * 
+ */
+function ocr_get_donorgroups() {
+  $groupList = array();
+  /*
+   * retrieve Donor Journey Group children
+   */
+  $parents = array(MAF_DONORJOURNEY_GROUP);
+  $hasChildren = ocr_check_group_has_children($parents);
+  while ($hasChildren == TRUE) {
+    foreach ($parents as $parent) {
+      $groupChildren = civicrm_api3('Group', 'Getvalue', array('id' => $parent, 'return' => 'children'));
+      if (!empty($groupChildren)) {
+        $children = explode(',', $groupChildren);
+        $parents = array();
+        foreach($children as $child) {
+          $parents[] = $child;
+          $groupData = civicrm_api3('Group', 'Getsingle', array('id' => $child));
+          $groupList[$groupData['id']] = $groupData['title'];
+        }
+      }
+    }
+    $hasChildren = ocr_check_group_has_children($parents);
+  }
+  return $groupList;
+}
+/**
+ * Function to check if one of the group parents has children
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 12 Jun 2014
+ * @param array $groupIds
+ * @return boolean $hasChildren
+ */
+function ocr_check_group_has_children($groupIds) {
+  $hasChildren = FALSE;
+  foreach ($groupIds as $groupId) {
+    $groupChildren = civicrm_api3('Group', 'Getvalue', array('id' => $groupId, 'return' => 'children'));
+    if (!empty($groupChildren)) {
+      $hasChildren = TRUE;
+    }
+  }
+  return $hasChildren;
+}
 /*
  * Implementation of hook_civicrm_config
  */
@@ -127,7 +251,18 @@ function ocr_civicrm_enable() {
     PRIMARY KEY (`contribution_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
   ");
-
+  
+  /*
+   * BOS1405148 create table to record group of donor at time of contribution
+   */
+  CRM_Core_DAO::executeQuery('
+    CREATE TABLE IF NOT EXISTS `civicrm_contribution_donorgroup` (
+    `contribution_id` int(10) unsigned NOT NULL,
+    `group_id` int(10) unsigned NOT NULL,
+    PRIMARY KEY (`contribution_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+  ');
+  
   CRM_Core_DAO::executeQuery("
     CREATE TABLE IF NOT EXISTS `civicrm_failed_kid_numbers` (
     `transmission_number` varchar(7) NOT NULL,
@@ -174,24 +309,165 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
   /*
    * BOS1405148
    * set default activity for contribution when status is set
-   * to completed. Defaulted to latest activity of contact (also for edit if 
-   * not set yet)
+   * to completed and linked activity is still empty. Defaulted to latest activity 
+   * of contact (also for edit if not set yet)
    * 
    * Delete record in contribution_activity when contribution is deleted
    */
   if ($objectName == 'Contribution') {
     if ($op == 'delete' && !empty($objectId)) {
-      $delQuery = 'DELETE FROM civicrm_contribution_activity WHERE contribution_id = %1';
+      $delActQuery = 'DELETE FROM civicrm_contribution_activity WHERE contribution_id = %1';
       $delParams = array(1 => array($objectId, 'Positive'));
-      CRM_Core_DAO::executeQuery($delQuery, $delParams);
+      $delDonorQuery = 'DELETE FROM civicrm_contribution_donorgroup WHERE contribution_id = %1';
+      CRM_Core_DAO::executeQuery($delActQuery, $delParams);
+      CRM_Core_DAO::executeQuery($delDonorQuery, $delParams);
     }
-    if ($op == 'create' || $op == 'edit') {
-      if ($objectRef->contribution_status_id == 1) {
-        ocr_process_contribution_activity($objectId, $objectRef->contact_id, $op);
+    if ($op == 'create') {
+      ocr_process_contribution_activity($objectId, $objectRef->contact_id);
+      ocr_process_contribution_donorgroup($objectId, $objectRef->receive_date);
+    }
+  }
+}
+/**
+ * Implementation of hook civicrm_postProcess
+ * (BOS1405148 - update contribution activity of donorgroup)
+ */
+function ocr_civicrm_postProcess($formName, &$form) {
+  if ($formName == 'CRM_Contribute_Form_Contribution') {
+    $action = $form->getVar('_action');
+    $contributionId = $form->getVar('_id');
+    if ($action == CRM_Core_Action::UPDATE) {
+      $values = $form->getVar('_submitValues');
+      if (isset($values['ocr_activity'])) {
+        ocr_create_contribution_activity($contributionId, $values['ocr_activity']);
+      }
+      if (isset($values['donor_group'])) {
+        ocr_create_contribution_donorgroup($contributionId, $values['donor_group']);
       }
     }
   }
 }
+/**
+ * Function to process civicrm_contribution_group
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 12 Jun 2014
+ * @param int $contributionId
+ * @param date $receiptDate
+ */
+function ocr_process_contribution_donorgroup($contributionId, $receiptDate) {
+  $checkExists = ocr_check_contribution_group($contributionId);
+  if ($checkExists == FALSE) {
+    $groupId = ocr_get_contribution_donorgroup($contributionId, $receiptDate, 0);
+    ocr_create_contribution_donorgroup($contributionId, $groupId);
+  }
+}
+/**
+ * Function get get the donor journey group the contact is member of, if any
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 17 Jun 2014
+ * @param array $contribution
+ * @param date $receiptDate
+ * @return int $groupId
+ */
+function ocr_get_contribution_donorgroup($contributionId, $receiptDate, $contactId) {
+  $groupId = 0;
+  if (!empty($contributionId)) {
+    $contactId = civicrm_api3('Contribution', 'Getvalue', array('id' => $contributionId, 'return' => 'contact_id'));
+  }
+  if (empty($receiptDate)) {
+    $receiptDate = date('Ymd');
+  }
+  /*
+   * get all groups for contact
+   */
+  $contactGroups = CRM_Contact_BAO_GroupContact::getContactGroup($contactId);
+  foreach ($contactGroups as $contactGroup) {
+    /*
+     * if group is donor journey group, check if active on receip date
+     */
+    if (ocr_check_group_is_donorgroup($contactGroup['group_id']) == TRUE 
+      && ocr_donorgroup_active_on_date($contactGroup, $receiptDate) == TRUE) {
+      $groupId = $contactGroup['group_id'];
+    }
+  }  
+  return $groupId;
+}
+/**
+ * Function to check if group membership is active on input date
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 17 Jun 2014
+ * @param array $group
+ * @param date $date
+ * @return boolean
+ */
+function ocr_donorgroup_active_on_date($group, $date) {
+  /*
+   * if isset in_date in group, then check if in_date is before or 
+   * on date because contact is in group at the moment
+   */
+  $checkDate = CRM_Utils_Date::processDate($date);
+  if (isset($group['in_date'])) {
+    $inDate = CRM_Utils_Date::processDate($group['in_date']);
+    if ($inDate <= $checkDate) {
+      return TRUE;
+    } else {
+      return FALSE;
+    }
+  }
+  if (isset($group['out_date'])) {
+    $outDate = CRM_Utils_Date::processDate($group['out_date']);
+    if ($outDate > $checkDate) {
+      return TRUE;
+    } else {
+      return FALSE;
+    }
+  }
+  return FALSE;
+}
+/**
+ * Function to check if group is part of donor journey group
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 17 Jun 2014
+ * @param int $groupId
+ * @return boolean
+ */
+function ocr_check_group_is_donorgroup($groupId) {
+  if ($groupId == MAF_DONORJOURNEY_GROUP) {
+    return TRUE;
+  }
+  $processedAll = FALSE;
+  $levelParents = array($groupId);
+  while ($processedAll == FALSE) {
+    foreach ($levelParents as $levelParent) {
+      $groupParents = civicrm_api3('Group', 'Getvalue', array('id' => $levelParent, 'return' => 'parents'));
+      if (empty($groupParents)) {
+        $processedAll = TRUE;
+      } else {
+        $processedAll = FALSE;
+      }
+      if (!empty($groupParents)) {
+        $parents = explode(',', $groupParents);
+        $levelParents = array();
+        foreach($parents as $parent) {
+          $levelParents[] = $parent;
+          if ($parent == MAF_DONORJOURNEY_GROUP) {
+            return TRUE;
+          }
+        }
+      }
+    }
+  }
+  return FALSE;
+}
+
 /**
  * Function to process civicrm_contribution_activity
  * (BOS1405148)
@@ -200,18 +476,12 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
  * @date 5 Jun 2014
  * @param int $contributionId
  * @param int $contactId
- * @param string $op
  */
-function ocr_process_contribution_activity($contributionId, $contactId, $op) {
-  /*
-   * if op == create, get latest activity for contact and create record
-   */
-  if ($op == 'create' || $op == 'edit') {
-    $checkExists = ocr_check_contribution_activity($contributionId);
-    if ($checkExists == FALSE) {
-      $activityId = ocr_get_latest_activity($contactId);
-      ocr_create_contribution_activity($contributionId, $activityId);
-    }
+function ocr_process_contribution_activity($contributionId, $contactId) {
+  $checkExists = ocr_check_contribution_activity($contributionId);
+  if ($checkExists == FALSE) {
+    $activityId = ocr_get_latest_activity($contactId);
+    ocr_create_contribution_activity($contributionId, $activityId);
   }
 }
 /**
@@ -237,6 +507,30 @@ function ocr_get_latest_activity($contactId) {
     $activityId = $dao->id;
   }
   return $activityId;
+}
+/**
+ * Function to check if there is a contribution_group record for contribution
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 12 Jun 2014
+ * @param int $contributionId
+ * @return boolean
+ */
+function ocr_check_contribution_group($contributionId) {
+  if (empty($contributionId)) {
+    return FALSE;
+  }
+  $query = 'SELECT COUNT(*) AS groupCount FROM civicrm_contribution_donorgroup WHERE contribution_id = %1';
+  $params = array(1 => array($contributionId, 'Positive'));
+  $dao = CRM_Core_DAO::executeQuery($query, $params);
+  
+  if ($dao->fetch()) {
+    if ($dao->groupCount > 0) {
+      return TRUE;
+    }
+  }
+  return FALSE;
 }
 
 /**
@@ -264,7 +558,21 @@ function ocr_check_contribution_activity($contributionId) {
   return FALSE;
 }
 /**
- * Function to create civicrm_contribution_activity_record
+ * Function to create civicrm_contribution_donorgroup record
+ * (BOS1405148)
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 12 Jun 2014
+ * @param int $contributionId
+ * @param int $groupId
+ */
+function ocr_create_contribution_donorgroup($contributionId, $groupId) {
+  $insQuery = ocr_contribution_donorgroup_query($contributionId);
+  $insParams = array(1 => array($contributionId, 'Positive'), 2 => array($groupId, 'Positive'));
+  CRM_Core_DAO::executeQuery($insQuery, $insParams);  
+}
+/**
+ * Function to create civicrm_contribution_activity record
  * (BOS1405148)
  * 
  * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
@@ -273,7 +581,7 @@ function ocr_check_contribution_activity($contributionId) {
  * @param int $activityId
  */
 function ocr_create_contribution_activity($contributionId, $activityId) {
-  $insQuery = 'INSERT INTO civicrm_contribution_activity SET contribution_id = %1, activity_id = %2';
+  $insQuery = ocr_contribution_activity_query($contributionId);
   $insParams = array(1 => array($contributionId, 'Positive'), 2 => array($activityId, 'Positive'));
   CRM_Core_DAO::executeQuery($insQuery, $insParams);  
 }
@@ -484,14 +792,14 @@ function ocr_set_act_earmark($activityId, $contributionId) {
   }
 }
 /**
- * Function to create the insert or update query for contribution/activity
- * (BOS1406389)
- * 
- * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
- * @date 16 Jun 2014
- * @param int $contributionId
- * @return string $query 
- */
+* Function to create the insert or update query for contribution/activity
+* (BOS1406389)
+*
+* @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+* @date 16 Jun 2014
+* @param int $contributionId
+* @return string $query
+*/
 function ocr_contribution_activity_query($contributionId) {
   $query = '';
   if (empty($contributionId)) {
@@ -501,10 +809,36 @@ function ocr_contribution_activity_query($contributionId) {
   $countDao = CRM_Core_DAO::executeQuery($countQry, array(1 => array($contributionId, 'Positive')));
   if ($countDao->fetch()) {
     $query .= ' civicrm_contribution_activity SET contribution_id = %1, activity_id = %2';
-    if ($countDao->countRecord > 0) {
-      $query = 'INSERT INTO '.$query;
+    if ($countDao->countRecords > 0) {
+      $query = 'UPDATE '.$query.' WHERE contribution_id = %1';
     } else {
-      $query = 'UPDATE '.$query.' WHERE contribution_id = %1';      
+      $query = 'INSERT INTO '.$query;
+    }
+  }
+  return $query;
+}
+/**
+* Function to create the insert or update query for contribution/donorgroup
+* (BOS1406389)
+*
+* @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+* @date 21 Jun 2014
+* @param int $contributionId
+* @return string $query
+*/
+function ocr_contribution_donorgroup_query($contributionId) {
+  $query = '';
+  if (empty($contributionId)) {
+    return $query;
+  }
+  $countQry = 'SELECT COUNT(*) AS countRecords FROM civicrm_contribution_donorgroup WHERE contribution_id = %1';
+  $countDao = CRM_Core_DAO::executeQuery($countQry, array(1 => array($contributionId, 'Positive')));
+  if ($countDao->fetch()) {
+    $query .= ' civicrm_contribution_donorgroup SET contribution_id = %1, group_id = %2';
+    if ($countDao->countRecords > 0) {
+      $query = 'UPDATE '.$query.' WHERE contribution_id = %1';
+    } else {
+      $query = 'INSERT INTO '.$query;
     }
   }
   return $query;

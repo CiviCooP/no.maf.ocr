@@ -489,12 +489,15 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                 return;
             
             }
-            
             $contribution = reset($result['values']);
             /*
              * BOS1406389
              */
+<<<<<<< HEAD
             $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id);
+=======
+            $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id); 
+>>>>>>> BOS1405148
             CRM_Core_DAO::singleValueQuery($actQuery, array(
                   1 => array($contribution['id'], 'Positive'),
                   2 => array($activity_id, 'Positive')
@@ -768,7 +771,10 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             }
 
             $contribution = reset($result['values']);
+<<<<<<< HEAD
 
+=======
+>>>>>>> BOS1405148
             /*
              * BOS1406389
              */

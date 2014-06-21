@@ -335,9 +335,9 @@
   
     <div class="crm-accordion-wrapper crm-accordion_title-accordion crm-accordion-processed" id="paymentDetails_Information">
       <div class="crm-accordion-header">
-        {* BOS1405148 - Erik Hommel (CiviCooP - <erik.hommel@civicoop.org> change name to Linked Activity *}  
+        {* BOS1405148 - Erik Hommel (CiviCooP - <erik.hommel@civicoop.org> change name to Linked Activity and add donor group *}  
         {*{ts}OCR Import/Export{/ts}*}
-        {ts}Linked Activity{/ts}
+        {ts}Linked Activity and Donor Group{/ts}
         {* end BOS1405148 *}
         
       </div>
@@ -347,6 +347,13 @@
             <td class="label">{$form.ocr_activity.label}</td>
             <td>{$form.ocr_activity.html}</td>
           </tr>
+          
+          {* BOS1405148 - add donor group *}
+          <tr>
+            <td class="label">{$form.donor_group.label}</td>
+            <td>{$form.donor_group.html}</td>
+          </tr>
+          
         </table>
         {$form.ocr_contact_id.html}
       </div>
