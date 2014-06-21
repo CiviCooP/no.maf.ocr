@@ -316,13 +316,34 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
    */
   if ($objectName == 'Contribution') {
     if ($op == 'delete' && !empty($objectId)) {
-      $delQuery = 'DELETE FROM civicrm_contribution_activity WHERE contribution_id = %1';
+      $delActQuery = 'DELETE FROM civicrm_contribution_activity WHERE contribution_id = %1';
       $delParams = array(1 => array($objectId, 'Positive'));
-      CRM_Core_DAO::executeQuery($delQuery, $delParams);
+      $delDonorQuery = 'DELETE FROM civicrm_contribution_donorgroup WHERE contribution_id = %1';
+      CRM_Core_DAO::executeQuery($delActQuery, $delParams);
+      CRM_Core_DAO::executeQuery($delDonorQuery, $delParams);
     }
-    if ($op == 'create' || $op == 'edit') {
+    if ($op == 'create') {
       ocr_process_contribution_activity($objectId, $objectRef->contact_id);
       ocr_process_contribution_donorgroup($objectId, $objectRef->receive_date);
+    }
+  }
+}
+/**
+ * Implementation of hook civicrm_postProcess
+ * (BOS1405148 - update contribution activity of donorgroup)
+ */
+function ocr_civicrm_postProcess($formName, &$form) {
+  if ($formName == 'CRM_Contribute_Form_Contribution') {
+    $action = $form->getVar('_action');
+    $contributionId = $form->getVar('_id');
+    if ($action == CRM_Core_Action::UPDATE) {
+      $values = $form->getVar('_submitValues');
+      if (isset($values['ocr_activity'])) {
+        ocr_create_contribution_activity($contributionId, $values['ocr_activity']);
+      }
+      if (isset($values['donor_group'])) {
+        ocr_create_contribution_donorgroup($contributionId, $values['donor_group']);
+      }
     }
   }
 }
@@ -546,7 +567,7 @@ function ocr_check_contribution_activity($contributionId) {
  * @param int $groupId
  */
 function ocr_create_contribution_donorgroup($contributionId, $groupId) {
-  $insQuery = 'INSERT INTO civicrm_contribution_donorgroup SET contribution_id = %1, group_id = %2';
+  $insQuery = ocr_contribution_donorgroup_query($contributionId);
   $insParams = array(1 => array($contributionId, 'Positive'), 2 => array($groupId, 'Positive'));
   CRM_Core_DAO::executeQuery($insQuery, $insParams);  
 }
@@ -789,9 +810,35 @@ function ocr_contribution_activity_query($contributionId) {
   if ($countDao->fetch()) {
     $query .= ' civicrm_contribution_activity SET contribution_id = %1, activity_id = %2';
     if ($countDao->countRecords > 0) {
-      $query = 'INSERT INTO '.$query;
-    } else {
       $query = 'UPDATE '.$query.' WHERE contribution_id = %1';
+    } else {
+      $query = 'INSERT INTO '.$query;
+    }
+  }
+  return $query;
+}
+/**
+* Function to create the insert or update query for contribution/donorgroup
+* (BOS1406389)
+*
+* @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+* @date 21 Jun 2014
+* @param int $contributionId
+* @return string $query
+*/
+function ocr_contribution_donorgroup_query($contributionId) {
+  $query = '';
+  if (empty($contributionId)) {
+    return $query;
+  }
+  $countQry = 'SELECT COUNT(*) AS countRecords FROM civicrm_contribution_donorgroup WHERE contribution_id = %1';
+  $countDao = CRM_Core_DAO::executeQuery($countQry, array(1 => array($contributionId, 'Positive')));
+  if ($countDao->fetch()) {
+    $query .= ' civicrm_contribution_donorgroup SET contribution_id = %1, group_id = %2';
+    if ($countDao->countRecords > 0) {
+      $query = 'UPDATE '.$query.' WHERE contribution_id = %1';
+    } else {
+      $query = 'INSERT INTO '.$query;
     }
   }
   return $query;
