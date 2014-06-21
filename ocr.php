@@ -357,6 +357,9 @@ function ocr_get_contribution_donorgroup($contributionId, $receiptDate, $contact
   if (!empty($contributionId)) {
     $contactId = civicrm_api3('Contribution', 'Getvalue', array('id' => $contributionId, 'return' => 'contact_id'));
   }
+  if (empty($receiptDate)) {
+    $receiptDate = date('Ymd');
+  }
   /*
    * get all groups for contact
    */
@@ -785,7 +788,7 @@ function ocr_contribution_activity_query($contributionId) {
   $countDao = CRM_Core_DAO::executeQuery($countQry, array(1 => array($contributionId, 'Positive')));
   if ($countDao->fetch()) {
     $query .= ' civicrm_contribution_activity SET contribution_id = %1, activity_id = %2';
-    if ($countDao->countRecord > 0) {
+    if ($countDao->countRecords > 0) {
       $query = 'INSERT INTO '.$query;
     } else {
       $query = 'UPDATE '.$query.' WHERE contribution_id = %1';
