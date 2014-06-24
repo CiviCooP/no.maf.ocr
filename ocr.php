@@ -20,7 +20,7 @@ define('MAF_HISTORIC_CUTOFF_ID', 700000);
 /*
  * BOS1405148 define constant for top level donor journey group
  */
-define('MAF_DONORJOURNEY_GROUP', 6509);
+define('MAF_DONORJOURNEY_GROUP', 6508);
 
 // Include civicrm_api3 wrapper for early 4.3 versions
 if (!class_exists('CiviCRM_API3_Exception')) {
@@ -322,10 +322,6 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
       CRM_Core_DAO::executeQuery($delActQuery, $delParams);
       CRM_Core_DAO::executeQuery($delDonorQuery, $delParams);
     }
-    if ($op == 'create') {
-      ocr_process_contribution_activity($objectId, $objectRef->contact_id);
-      ocr_process_contribution_donorgroup($objectId, $objectRef->receive_date);
-    }
   }
 }
 /**
@@ -336,8 +332,10 @@ function ocr_civicrm_postProcess($formName, &$form) {
   if ($formName == 'CRM_Contribute_Form_Contribution') {
     $action = $form->getVar('_action');
     $contributionId = $form->getVar('_id');
-    if ($action == CRM_Core_Action::UPDATE) {
+    if ($action == CRM_Core_Action::UPDATE || $action == CRM_Core_Action::ADD) {
       $values = $form->getVar('_submitValues');
+      CRM_Core_Error::debug('values', $values);
+      exit();
       if (isset($values['ocr_activity'])) {
         ocr_create_contribution_activity($contributionId, $values['ocr_activity']);
       }
