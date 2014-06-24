@@ -491,13 +491,9 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             }
             $contribution = reset($result['values']);
             /*
-             * BOS1406389
+             * BOS1406389/BOS1405148
              */
-<<<<<<< HEAD
-            $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id);
-=======
             $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id); 
->>>>>>> BOS1405148
             CRM_Core_DAO::singleValueQuery($actQuery, array(
                   1 => array($contribution['id'], 'Positive'),
                   2 => array($activity_id, 'Positive')
@@ -771,12 +767,8 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             }
 
             $contribution = reset($result['values']);
-<<<<<<< HEAD
-
-=======
->>>>>>> BOS1405148
             /*
-             * BOS1406389
+             * BOS1406389/BOS1405148
              */
             $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id);
             // link to activity
@@ -1005,7 +997,16 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             }
 
             $contribution = reset($result['values']);
-
+            
+            /*
+             * BOS1405148 add contribution/activity and contribution/donor group
+             * based on contact and receive_date
+             */
+            $latestActivityId = ocr_get_latest_activity($contribution['contact_id']);
+            ocr_create_contribution_activity($contribution['id'], $latestActivityId);
+            $donorGroupId = ocr_get_contribution_donorgroup($contribution['id'], $contribution['receive_date'], $contribution['contact_id']);
+            ocr_create_contribution_donorgroup($contribution['id'], $donorGroupId);
+            
             $this->addReportLine('ok', ts(
                 "Successfully completed contribution (id: %1) for KID Number '%2' (%3) at line %4",
                 array(
@@ -1083,26 +1084,3 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
     }
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
