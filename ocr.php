@@ -331,11 +331,18 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
 function ocr_civicrm_postProcess($formName, &$form) {
   if ($formName == 'CRM_Contribute_Form_Contribution') {
     $action = $form->getVar('_action');
-    $contributionId = $form->getVar('_id');
+    if ($action == CRM_Core_Action::ADD) {
+      $contactId = $form->getVar('_contactID');
+      $query = 'SELECT MAX(id) AS maxId FROM civicrm_contribution WHERE contact_id = %1';
+      $dao = CRM_Core_DAO::executeQuery($query, array(1 => array($contactId, 'Positive')));
+      if ($dao->fetch()) {
+        $contributionId = $dao->maxId;
+      }
+    } else {
+      $contributionId = $form->getVar('_id');
+    }
     if ($action == CRM_Core_Action::UPDATE || $action == CRM_Core_Action::ADD) {
       $values = $form->getVar('_submitValues');
-      CRM_Core_Error::debug('values', $values);
-      exit();
       if (isset($values['ocr_activity'])) {
         ocr_create_contribution_activity($contributionId, $values['ocr_activity']);
       }
