@@ -1,4 +1,4 @@
-<?php
+BOS<?php
 
 /* 
  * OCR Import / Export Extension for CiviCRM - Circle Interactive 2013
