@@ -212,9 +212,13 @@ function ocr_get_donorgroups() {
 function ocr_check_group_has_children($groupIds) {
   $hasChildren = FALSE;
   foreach ($groupIds as $groupId) {
-    $groupChildren = civicrm_api3('Group', 'Getvalue', array('id' => $groupId, 'return' => 'children'));
-    if (!empty($groupChildren)) {
-      $hasChildren = TRUE;
+    try {
+      $groupChildren = civicrm_api3('Group', 'Getvalue', array('id' => $groupId, 'return' => 'children'));
+      if (!empty($groupChildren)) {
+        $hasChildren = TRUE;
+      }
+    } catch (CiviCRM_API3_Exception $ex) {
+      $hasChildren = FALSE;
     }
   }
   return $hasChildren;
