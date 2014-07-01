@@ -401,7 +401,7 @@ function ocr_get_contribution_donorgroup($contributionId, $receiptDate, $contact
   $contactGroups = CRM_Contact_BAO_GroupContact::getContactGroup($contactId);
   foreach ($contactGroups as $contactGroup) {
     /*
-     * if group is donor journey group, check if active on receip date
+     * if group is donor journey group, check if active on receive date
      */
     if (ocr_check_group_is_donorgroup($contactGroup['group_id']) == TRUE 
       && ocr_donorgroup_active_on_date($contactGroup, $receiptDate) == TRUE) {
@@ -461,11 +461,15 @@ function ocr_check_group_is_donorgroup($groupId) {
   $levelParents = array($groupId);
   while ($processedAll == FALSE) {
     foreach ($levelParents as $levelParent) {
-      $groupParents = civicrm_api3('Group', 'Getvalue', array('id' => $levelParent, 'return' => 'parents'));
-      if (empty($groupParents)) {
+      try {
+        $groupParents = civicrm_api3('Group', 'Getvalue', array('id' => $levelParent, 'return' => 'parents'));
+        if (empty($groupParents)) {
+          $processedAll = TRUE;
+        } else {
+          $processedAll = FALSE;
+        }
+      } catch (CiviCRM_API3_Exception $ex) {
         $processedAll = TRUE;
-      } else {
-        $processedAll = FALSE;
       }
       if (!empty($groupParents)) {
         $parents = explode(',', $groupParents);
