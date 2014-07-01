@@ -188,8 +188,11 @@ function ocr_get_donorgroups() {
         $parents = array();
         foreach($children as $child) {
           $parents[] = $child;
-          $groupData = civicrm_api3('Group', 'Getsingle', array('id' => $child));
-          $groupList[$groupData['id']] = $groupData['title'];
+          try {
+            $groupData = civicrm_api3('Group', 'Getsingle', array('id' => $child));
+            $groupList[$groupData['id']] = $groupData['title'];
+          } catch (CiviCRM_API3_Exception $ex) {
+          }
         }
       }
     }
