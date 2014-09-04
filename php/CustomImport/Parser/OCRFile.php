@@ -1,4 +1,4 @@
-BOS<?php
+<?php
 
 /* 
  * OCR Import / Export Extension for CiviCRM - Circle Interactive 2013
@@ -230,7 +230,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
 
             $record['kid'] = trim($record['kid']);
             $this->import_total += (float)($record['amount'] / 100);
-
+            
             switch (strlen($record['kid'])) {
                 
                 // 9 digit kid number ..
@@ -308,7 +308,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
         if (!$status_id)
             $status_id = array_flip(CRM_Contribute_PseudoConstant::contributionStatus());
 
-        $test = $this->test;
+            $test = $this->test;  
 
         // lookup activity
         if (!$kid = kid_number_get_info($record['kid'])) {
@@ -515,6 +515,24 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
                         "SELECT display_name FROM civicrm_contact WHERE id = %1",
                         array(1 => array($contact_id, 'Positive'))
                     ),
+                    4 => $record['line_no']
+                )
+            ));
+            /*
+             * BOS1405148 add contribution/activity and contribution/donor group
+             * based on contact and receive_date
+             */
+            $latestActivityId = ocr_get_latest_activity($contribution['contact_id']);
+            ocr_create_contribution_activity($contribution['id'], $latestActivityId);
+            $donorGroupId = ocr_get_contribution_donorgroup($contribution['id'], $contribution['receive_date'], $contribution['contact_id']);
+            ocr_create_contribution_donorgroup($contribution['id'], $donorGroupId);
+            
+            $this->addReportLine('ok', ts(
+                "Successfully completed contribution (id: %1) for KID Number '%2' (%3) at line %4",
+                array(
+                    1 => $contribution['id'],
+                    2 => $record['kid'],
+                    3 => $this->getDisplayName($contribution['contact_id']),
                     4 => $record['line_no']
                 )
             ));

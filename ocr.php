@@ -387,13 +387,13 @@ function ocr_process_contribution_donorgroup($contributionId, $receiptDate) {
  * @param date $receiptDate
  * @return int $groupId
  */
-function ocr_get_contribution_donorgroup($contributionId, $receiptDate, $contactId) {
+function ocr_get_contribution_donorgroup($contributionId, $receiveDate, $contactId) {
   $groupId = 0;
   if (!empty($contributionId)) {
     $contactId = civicrm_api3('Contribution', 'Getvalue', array('id' => $contributionId, 'return' => 'contact_id'));
   }
-  if (empty($receiptDate)) {
-    $receiptDate = date('Ymd');
+  if (empty($receiveDate)) {
+    $receiveDate = date('Ymd');
   }
   /*
    * get all groups for contact
@@ -404,7 +404,7 @@ function ocr_get_contribution_donorgroup($contributionId, $receiptDate, $contact
      * if group is donor journey group, check if active on receive date
      */
     if (ocr_check_group_is_donorgroup($contactGroup['group_id']) == TRUE 
-      && ocr_donorgroup_active_on_date($contactGroup, $receiptDate) == TRUE) {
+      && ocr_donorgroup_active_on_date($contactGroup, $receiveDate) == TRUE) {
       $groupId = $contactGroup['group_id'];
     }
   }  
