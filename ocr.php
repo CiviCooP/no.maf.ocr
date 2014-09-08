@@ -790,13 +790,37 @@ function ocr_set_act_earmark($activityId, $contributionId) {
     }
     $earMarkingField = _recurring_getNetsField('earmarking');
     $balanseKontoField = _recurring_getNetsField('balansekonto');
-    $netsSql = 'REPLACE INTO '.$netsGroupTable.' (entity_id, '.$earMarkingField.', '.
-    $balanseKontoField.') VALUES(%1, %2, %3)';
-    $netsParams = array(
-      1 => array($contributionId, 'Integer'),
-      2 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
-      3 => array(1920, 'Integer')
-    );
+    /*
+     * check if we already have a nets record for this contribution (we should!)
+     * if so, update else create
+     */
+    $checkSql = 'SELECT COUNT(*) AS countNets, id FROM '.$netsGroupTable.' WHERE entity_id = %1';
+    $checkParams = array(1 => array($contributionId, 'Integer'));
+    $daoCheckNets = CRM_Core_DAO::executeQuery($checkSql, $checkParams);
+    if ($daoCheckNets->fetch()) {
+      if ($daoCheckNets->countNets > 0) {
+        $netsSql = 'UPDATE '.$netsGroupTable.'SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2 WHERE id = %3';
+        $netsParams = array(
+          1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
+          2 => array(1920, 'Integer'),
+          3 => array($daoCheckNets->id, 'Integer')
+        );
+      } else {
+        $netsSql = 'INSERT INTO '.$netsGroupTable.'SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
+        $netsParams = array(
+          1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
+          2 => array(1920, 'Integer'),
+          3 => array($contributionId, 'Integer')
+        );        
+      }
+    } else {
+      $netsSql = 'INSERT INTO '.$netsGroupTable.'SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
+      $netsParams = array(
+        1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
+        2 => array(1920, 'Integer'),
+        3 => array($contributionId, 'Integer')
+      );        
+    }
     CRM_Core_DAO::executeQuery($netsSql, $netsParams);
     /*
      * update financial type id on contribution based on earmarking
