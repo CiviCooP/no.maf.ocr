@@ -29,7 +29,7 @@ class php_CRM_OcrConfig {
     $this->getCustomGroup();
     $this->setFinTypeFieldName('fin_type_maf');
     $this->getCustomField();
-    $this->setTopLevelDonorGroupId(6508);
+    $this->setTopLevelDonorGroupId(6509);
     $this->setDefaultFinTypeId(40);
   }
   private function setFinTypeGroupName($finTypeGroupName) {
