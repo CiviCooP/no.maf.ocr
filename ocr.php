@@ -799,14 +799,14 @@ function ocr_set_act_earmark($activityId, $contributionId) {
     $daoCheckNets = CRM_Core_DAO::executeQuery($checkSql, $checkParams);
     if ($daoCheckNets->fetch()) {
       if ($daoCheckNets->countNets > 0) {
-        $netsSql = 'UPDATE '.$netsGroupTable.'SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2 WHERE id = %3';
+        $netsSql = 'UPDATE '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2 WHERE id = %3';
         $netsParams = array(
           1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
           2 => array(1920, 'Integer'),
           3 => array($daoCheckNets->id, 'Integer')
         );
       } else {
-        $netsSql = 'INSERT INTO '.$netsGroupTable.'SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
+        $netsSql = 'INSERT INTO '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
         $netsParams = array(
           1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
           2 => array(1920, 'Integer'),
@@ -814,7 +814,7 @@ function ocr_set_act_earmark($activityId, $contributionId) {
         );        
       }
     } else {
-      $netsSql = 'INSERT INTO '.$netsGroupTable.'SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
+      $netsSql = 'INSERT INTO '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
       $netsParams = array(
         1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
         2 => array(1920, 'Integer'),
