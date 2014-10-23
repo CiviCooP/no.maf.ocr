@@ -303,242 +303,221 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
     // sub method of import() - handles importing as part of activity-based direct mailing
     // (9 digit KID number)
     protected function import_from_activity(&$record) {
-
-        static $status_id = null;
-        if (!$status_id)
-            $status_id = array_flip(CRM_Contribute_PseudoConstant::contributionStatus());
-
-            $test = $this->test;  
-
-        // lookup activity
-        if (!$kid = kid_number_get_info($record['kid'])) {
-            
-            $message = ts(
-                "Failed looking up activity for KID number '%1' at line %2",
-                array(
-                    1 => $record['kid'],
-                    2 => $record['line_no']
-                )
-            );
-
-            $this->addReportLine('warning', $message);
-            
-            if (!$test)
-                $this->createFailureTableEntry($record, $message);            
-
-            return;
+      static $status_id = null;
+      if (!$status_id) {
+        $status_id = array_flip(CRM_Contribute_PseudoConstant::contributionStatus());
+      }
+      // lookup activity
+      if (!$kid = kid_number_get_info($record['kid'])) {
+        $message = ts("Failed looking up activity for KID number '%1' at line %2", array(
+          1 => $record['kid'],
+          2 => $record['line_no']
+        ));
+        $this->addReportLine('warning', $message);
+        if (!$this->test) {
+          $this->createFailureTableEntry($record, $message);
         }
-        
-        if ($kid['entity'] != 'Activity' && $kid['entity'] != 'ActivityTarget') {
-            
-            $message = ts(
-                "Matched wrong type of entity (%1 - should be Activity) for KID number '%2' at line %3",
-                array(
-                    1 => $kid['entity'],
-                    2 => $record['kid'],
-                    3 => $record['line_no']
-                )
-            );
+        return;
+      }
 
-            $this->addReportLine('error', $message);
-            
-            if (!$test)
-                $this->createFailureTableEntry($record, $message);
+      //code below is not neccesary
+      //we check if a 9KID number is linked to a contact rather than demanding a 
+      //certain entity
+      /* if ($kid['entity'] != 'Activity' && $kid['entity'] != 'ActivityTarget') {
 
-            return;
-        }
-
-        $activity_id = $kid['entity_id'];
-
-        if (!$contact_id = CRM_Core_DAO::singleValueQuery("
-            SELECT target_contact_id FROM civicrm_activity_target
-             WHERE activity_id = %1 and target_contact_id = %2
-        ", array(
-              1 => array($activity_id, 'Positive'),
-			  2 => array($kid['contact_id'], 'Positive'),
-           )
-        )) {
-            
-            $message = ts(
-                "Failed looking up activity target contact for KID number '%1' at line %2 (Activity ID %3 and Contact ID %4)",
-                array(
-                    1 => $record['kid'],
-                    2 => $record['line_no'],
-					3 => $activity_id,
-					4 => $kid['contact_id'],
-                )
-            );
-
-            $this->addReportLine('warning', $message);
-
-            if (!$test)
-                $this->createFailureTableEntry($record, $message);
-
-            return;        
-        }
-
-        // check for duplicate transaction numbers ..
-        if ($this->transactionIDExists($record))
-            return;
-
-        $trxn_id = $record['transmission_number'] . '-' . $record['transaction_number'];
-
-        // lookup aksjon_id from the activity, if it exists
-        $aksjon_id = CRM_Core_DAO::singleValueQuery("
-            SELECT aksjon_id_38 FROM civicrm_value_maf_norway_aksjon_import_1578
-             WHERE entity_id = %1
-        ", array(
-              1 => array($activity_id, 'Positive')
-           )
+        $message = ts(
+        "Matched wrong type of entity (%1 - should be Activity) for KID number '%2' at line %3",
+        array(
+        1 => $kid['entity'],
+        2 => $record['kid'],
+        3 => $record['line_no']
+        )
         );
 
-        // payment instrument check - this will fail on circle dev server, as payment instruments not present
-        // we should not see this warning in production
-        if (!$payment_instrument_id = $this->getPaymentInstrumentID($record['transaction_type']))
-            $this->addReportLine('warning', ts(
-                "Payment instrument unmatched for transaction type %1 - KID Number '%2', line %3. %4",
-                array(
-                    1 => $record['transaction_type'],
-                    2 => $record['kid'],
-                    3 => $record['line_no'],
-                    4 => $test ? ts('Record will still be imported, but with payment instrument unset.') : ts('Record was imported with payment instrument unset.')
-                )
-            ));
+        $this->addReportLine('error', $message);
 
-        if ($test) {
-            
-            // if test mode, inform the user a match was made, but do not update
-            $this->addReportLine('ok', ts(
-                "Matched KID number '%1' with activity id %2 at line %3",
-                array(
-                    1 => $record['kid'],
-                    2 => $kid['entity_id'],
-                    3 => $record['line_no']
-                )
-            ));
-            
-        } else {
-            
-            // create contribution linked to the activity
-            $params = array(
-                'total_amount'           => $record['amount'] / 100,
-                'financial_type_id'      => 1, 
-                'contact_id'             => $contact_id,
-                'receive_date'           => $this->convertNETSDate($record['nets_date']),
-                'trxn_id'                => $trxn_id,
-                'invoice_id'             => md5(uniqid(rand())),
-                'source'                 => 'NETS',
-                'contribution_status_id' => $status_id['Completed']
-            );
+        if (!$this->test)
+        $this->createFailureTableEntry($record, $message);
 
-            if ($payment_instrument_id)
-                $params['payment_instrument_id'] = $payment_instrument_id;
+        return;
+        } */
+      $activity_id = false;
+      if ($kid['entity'] == 'Activity' || $kid['entity'] == 'ActivityTarget') {
+        $activity_id = $kid['entity_id'];
+      }
+      
+      //get contact ID from kid record
+      $contact_id = $kid['contact_id'];
+      //if contact ID is not set try to retrieve it from the linked entity (Activity)
+      if (empty($contact_id) && ($kid['entity'] == 'Activity' || $kid['entity'] == 'ActivityTarget')) {
+        $contact_id = CRM_Core_DAO::singleValueQuery("
+               SELECT target_contact_id FROM civicrm_activity_target
+               WHERE activity_id = %1 and target_contact_id = %2", array(
+              1 => array($kid['entity_id'], 'Positive'),
+              2 => array($kid['contact_id'], 'Positive'),
+        ));
+      }
 
-            foreach ($this->custom_fields as $name => $id) {
-                
-                switch (true) {
-                    case isset($record[$name]):
-                        $params['custom_' . $id] = $record[$name];
-                        break;
-                    case $name == 'kid_number':
-                        $params['custom_' . $id] = $record['kid'];
-                        break;
-                    
-                    /*
-                     * BOS1311802 Critical bug in OCR import
-                     * Erik Hommel (erik.hommel@civicoop.org) on 22/11/2013
-                     * trying to create a contribution with a null value
-                     * in aksjon_id. So included a test on aksjon_id being
-                     * set and not empty
-                     */
-                    case $name == 'aksjon_id':
-                        if (isset($aksjon_id) && !empty($aksjon_id)) {
-                            $params['custom_' . $id] = $aksjon_id;
-                        }
-                        break;
-                    case $name == 'balans_konto':
-                        // balans konto always set to 1920
-                        $params['custom_' . $id] = '1920';
-                        break;
-                    case $name == 'sent_to_bank':
-                        // always set to 'No' for this type of transaction
-                        $params['custom_' . $id] = 0;
-                        break;
-                }
+      //check if contact_id is found
+      if (empty($contact_id)) { 
+        $message = ts("Failed looking up activity target contact for KID number '%1' at line %2 (%3 ID %4 and Contact ID %5)", array(
+          1 => $record['kid'],
+          2 => $record['line_no'],
+          3 => $kid['entity'],
+          4 => $kid['entity_id'],
+          5 => $kid['contact_id'],
+            )
+        );
+        $this->addReportLine('warning', $message);
+        if (!$test) {
+          $this->createFailureTableEntry($record, $message);
+        }
+        return;
+      }
 
-            }
-            try {
-                
-                $result = civicrm_api3('contribution', 'create', $params);
-            
-            } catch (CiviCRM_API3_Exception $e) {
-                
-                $message = ts(
-                    "An error occurred saving contribution data for KID Number '%1' (%2) at line %3: %4",
-                    array(
-                        1 => $record['kid'],
-                        2 => $this->getDisplayName($contact_id),
-                        3 => $record['line_no'],
-                        4 => $e->getMessage()
-                    )
-                );
+      // check for duplicate transaction numbers ..
+      if ($this->transactionIDExists($record)) {
+          return;
+      }
 
-                $this->addReportLine('error', $message);
-                $this->createFailureTableEntry($record, $message);
+      $trxn_id = $record['transmission_number'] . '-' . $record['transaction_number'];
+      $aksjon_id = $kid['aksjon_id'];
 
-                return;
-            
-            }
-            $contribution = reset($result['values']);
-            /*
-             * BOS1406389/BOS1405148
-             */
-            $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id); 
-            CRM_Core_DAO::singleValueQuery($actQuery, array(
-                  1 => array($contribution['id'], 'Positive'),
-                  2 => array($activity_id, 'Positive')
-               )
-            );
-            /*
-             * BOS1312346 retrieve earmarking from activity and set as default
-             * for contribution in nets transactions custom group
-             */
-            ocr_set_act_earmark($activity_id, $contribution['id']);
-            // end BOS1312346
+      // lookup aksjon_id from the activity, if it exists
+      if (empty($aksjon_id) && !empty($activity_id)) {
+        $aksjon_id = CRM_Core_DAO::singleValueQuery("SELECT aksjon_id_38 FROM civicrm_value_maf_norway_aksjon_import_1578 WHERE entity_id = %1", array(1 => array($activity_id, 'Positive')));
+      }
 
-            $this->addReportLine('ok', ts(
-                "Successfully created contribution (id: %1) for KID Number '%2' (%3) at line %4",
-                array(
-                    1 => $contribution['id'],
-                    2 => $record['kid'],
-                    3 => CRM_Core_DAO::singleValueQuery(
-                        "SELECT display_name FROM civicrm_contact WHERE id = %1",
-                        array(1 => array($contact_id, 'Positive'))
-                    ),
-                    4 => $record['line_no']
-                )
-            ));
-            /*
-             * BOS1405148 add contribution/activity and contribution/donor group
-             * based on contact and receive_date
-             */
-            $latestActivityId = ocr_get_latest_activity($contribution['contact_id']);
-            ocr_create_contribution_activity($contribution['id'], $latestActivityId);
-            $donorGroupId = ocr_get_contribution_donorgroup($contribution['id'], $contribution['receive_date'], $contribution['contact_id']);
-            ocr_create_contribution_donorgroup($contribution['id'], $donorGroupId);
-            
-            $this->addReportLine('ok', ts(
-                "Successfully completed contribution (id: %1) for KID Number '%2' (%3) at line %4",
-                array(
-                    1 => $contribution['id'],
-                    2 => $record['kid'],
-                    3 => $this->getDisplayName($contribution['contact_id']),
-                    4 => $record['line_no']
-                )
-            ));
-        
+      // payment instrument check - this will fail on circle dev server, as payment instruments not present
+      // we should not see this warning in production
+      if (!$payment_instrument_id = $this->getPaymentInstrumentID($record['transaction_type'])) {
+        $this->addReportLine('warning', ts("Payment instrument unmatched for transaction type %1 - KID Number '%2', line %3. %4", array(
+            1 => $record['transaction_type'],
+            2 => $record['kid'],
+            3 => $record['line_no'],
+            4 => $this->test ? ts('Record will still be imported, but with payment instrument unset.') : ts('Record was imported with payment instrument unset.')
+        )));
+      }
+
+      if ($this->test) {
+        // if test mode, inform the user a match was made, but do not update
+        $this->addReportLine('ok', ts("Matched KID number '%1' with activity id %2 at line %3", array(
+          1 => $record['kid'],
+          2 => $kid['entity_id'],
+          3 => $record['line_no']
+        )));  
+      } else {      
+        // create contribution linked to the activity
+        $params = array(
+          'total_amount'           => $record['amount'] / 100,
+          'financial_type_id'      => 1, 
+          'contact_id'             => $contact_id,
+          'receive_date'           => $this->convertNETSDate($record['nets_date']),
+          'trxn_id'                => $trxn_id,
+          'invoice_id'             => md5(uniqid(rand())),
+          'source'                 => 'NETS',
+          'contribution_status_id' => $status_id['Completed']
+        );
+
+        if ($payment_instrument_id) {
+          $params['payment_instrument_id'] = $payment_instrument_id;
         }
 
+        foreach ($this->custom_fields as $name => $id) {                
+          switch (true) {
+            case isset($record[$name]):
+              $params['custom_' . $id] = $record[$name];
+              break;
+            case $name == 'kid_number':
+              $params['custom_' . $id] = $record['kid'];
+              break;
+                    
+            /*
+             * BOS1311802 Critical bug in OCR import
+             * Erik Hommel (erik.hommel@civicoop.org) on 22/11/2013
+             * trying to create a contribution with a null value
+             * in aksjon_id. So included a test on aksjon_id being
+             * set and not empty
+             */
+            case $name == 'aksjon_id':
+              if (isset($aksjon_id) && !empty($aksjon_id)) {
+                $params['custom_' . $id] = $aksjon_id;
+              }
+              break;
+            case $name == 'balans_konto':
+              // balans konto always set to 1920
+              $params['custom_' . $id] = '1920';
+              break;
+            case $name == 'sent_to_bank':
+              // always set to 'No' for this type of transaction
+              $params['custom_' . $id] = 0;
+              break;
+          }
+        }
+        try {
+          $result = civicrm_api3('contribution', 'create', $params);  
+        } catch (CiviCRM_API3_Exception $e) {
+          $message = ts("An error occurred saving contribution data for KID Number '%1' (%2) at line %3: %4", array(
+            1 => $record['kid'],
+            2 => $this->getDisplayName($contact_id),
+            3 => $record['line_no'],
+            4 => $e->getMessage()
+          ));
+
+          $this->addReportLine('error', $message);
+          $this->createFailureTableEntry($record, $message);
+
+          return;
+        }
+        
+        $contribution = reset($result['values']);
+        /*
+         * BOS1406389/BOS1405148
+         */
+        $actQuery = ocr_contribution_activity_query($contribution['id'], $activity_id); 
+        CRM_Core_DAO::singleValueQuery($actQuery, array(
+              1 => array($contribution['id'], 'Positive'),
+              2 => array($activity_id, 'Positive')
+           )
+        );
+        /*
+         * BOS1312346 retrieve earmarking from activity and set as default
+         * for contribution in nets transactions custom group
+         */
+        $earmark = '';
+        if (!empty($kid['earmark'])) {
+          $earmark = $kid['earmark'];
+        } else {
+          $earmark = ocr_get_act_earmark($activity_id, $contribution['id']);
+        }
+        ocr_set_act_earmark($earmark, $contribution['id']);
+        // end BOS1312346
+
+        $this->addReportLine('ok', ts("Successfully created contribution (id: %1) for KID Number '%2' (%3) at line %4", array(
+          1 => $contribution['id'],
+          2 => $record['kid'],
+          3 => CRM_Core_DAO::singleValueQuery(
+              "SELECT display_name FROM civicrm_contact WHERE id = %1",
+              array(1 => array($contact_id, 'Positive'))
+          ),
+          4 => $record['line_no']
+        )));
+        /*
+         * BOS1405148 add contribution/activity and contribution/donor group
+         * based on contact and receive_date
+         */
+        $latestActivityId = ocr_get_latest_activity($contribution['contact_id']);
+        ocr_create_contribution_activity($contribution['id'], $latestActivityId);
+        $donorGroupId = ocr_get_contribution_donorgroup($contribution['id'], $contribution['receive_date'], $contribution['contact_id']);
+        ocr_create_contribution_donorgroup($contribution['id'], $donorGroupId);
+
+        $this->addReportLine('ok', ts("Successfully completed contribution (id: %1) for KID Number '%2' (%3) at line %4", array(
+          1 => $contribution['id'],
+          2 => $record['kid'],
+          3 => $this->getDisplayName($contribution['contact_id']),
+          4 => $record['line_no']
+        )));
+      }
     }
 
     /*
