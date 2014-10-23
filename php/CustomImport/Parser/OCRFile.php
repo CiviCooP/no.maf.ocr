@@ -316,7 +316,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             )
         );
         $this->addReportLine('warning', $message);
-        if (!$test) {
+        if (!$this->test) {
           $this->createFailureTableEntry($record, $message);
         }
         return;
@@ -338,7 +338,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
 
         $this->addReportLine('error', $message);
 
-        if (!$test)
+        if (!$this->test)
         $this->createFailureTableEntry($record, $message);
 
         return;
@@ -371,7 +371,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
             )
         );
         $this->addReportLine('warning', $message);
-        if (!$test) {
+        if (!$this->test) {
           $this->createFailureTableEntry($record, $message);
         }
         return;
@@ -397,11 +397,11 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
         1 => $record['transaction_type'],
         2 => $record['kid'],
         3 => $record['line_no'],
-        4 => $test ? ts('Record will still be imported, but with payment instrument unset.') : ts('Record was imported with payment instrument unset.')
+        4 => $this->test ? ts('Record will still be imported, but with payment instrument unset.') : ts('Record was imported with payment instrument unset.')
         )));
       }
       
-      if ($test) {            
+      if ($this->test) {            
         // if test mode, inform the user a match was made, but do not update
         $this->addReportLine('ok', ts("Matched KID number '%1' with activity id %2 at line %3",array(
           1 => $record['kid'],
