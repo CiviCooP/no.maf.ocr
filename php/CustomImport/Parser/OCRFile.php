@@ -519,7 +519,7 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
         )));
       }
     }
-
+    
     /*
      * Following an IRC conversation with Steinar on 16/10/2013, we decided the only way to 
      * get historic Avtale Giro transactions to successfully import, would be to write
