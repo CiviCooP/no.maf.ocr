@@ -485,8 +485,8 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
          * for contribution in nets transactions custom group
          */
         $earmark = '';
-        if (!empty($kid['earmark'])) {
-          $earmark = $kid['earmark'];
+        if (!empty($kid['earmarking'])) {
+          $earmark = $kid['earmarking'];
         } else {
           $earmark = ocr_get_act_earmark($activity_id, $contribution['id']);
         }
