@@ -407,7 +407,7 @@ function ocr_get_contribution_donorgroup($contributionId, $receiveDate, $contact
       && ocr_donorgroup_active_on_date($contactGroup, $receiveDate) == TRUE) {
       $groupId = $contactGroup['group_id'];
     }
-  }  
+  }
   return $groupId;
 }
 /**
@@ -518,7 +518,7 @@ function ocr_get_latest_activity($contactId) {
   }
   $query = 'SELECT a.id FROM civicrm_activity a INNER JOIN civicrm_activity_target b '
     . 'ON a.id = b.activity_id WHERE target_contact_id = %1 AND is_current_revision = 1 '
-    . 'ORDER BY activity_date_time DESC';
+    . ' AND activity_type_id != 6 ORDER BY activity_date_time DESC';
   $params = array(1 => array($contactId, 'Positive'));
   $dao = CRM_Core_DAO::executeQuery($query, $params);
   if ($dao->fetch()) {
