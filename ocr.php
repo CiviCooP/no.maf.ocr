@@ -744,9 +744,80 @@ function ocr_set_message($message) {
  * @param int $contributionId
  * @return void
  */
-function ocr_set_act_earmark($activityId, $contributionId) {
-  if (empty($activityId) || empty($contributionId)) {
+function ocr_set_act_earmark($earmark, $contributionId) {
+  if (empty($earmark) || empty($contributionId)) {
     return;
+  }
+
+  $netsGroupParams = array(
+    'name'  =>  'nets_transactions',
+    'return'=>  'table_name'
+  );
+  try {
+    $netsGroupTable = civicrm_api3('CustomGroup', 'Getvalue', $netsGroupParams);
+  } catch (CiviCRM_API3_Exception $e) {
+    throw new CiviCRM_API3_Exception('Could not find custom group with name
+      nets_transactions, configuration is incorrect. Error message 
+      from API CustomGroup Getvalue :'.$e->getMessage());
+  }
+  $earMarkingField = _recurring_getNetsField('earmarking');
+  $balanseKontoField = _recurring_getNetsField('balansekonto');
+  /*
+   * check if we already have a nets record for this contribution (we should!)
+   * if so, update else create
+   */
+  $checkSql = 'SELECT COUNT(*) AS countNets, id FROM '.$netsGroupTable.' WHERE entity_id = %1';
+  $checkParams = array(1 => array($contributionId, 'Integer'));
+  $daoCheckNets = CRM_Core_DAO::executeQuery($checkSql, $checkParams);
+  if ($daoCheckNets->fetch()) {
+    if ($daoCheckNets->countNets > 0) {
+      $netsSql = 'UPDATE '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2 WHERE id = %3';
+      $netsParams = array(
+        1 => array($earmark, 'Integer'),
+        2 => array(1920, 'Integer'),
+        3 => array($daoCheckNets->id, 'Integer')
+      );
+    } else {
+      $netsSql = 'INSERT INTO '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
+      $netsParams = array(
+        1 => array($earmark, 'Integer'),
+        2 => array(1920, 'Integer'),
+        3 => array($contributionId, 'Integer')
+      );        
+    }
+  } else {
+    $netsSql = 'INSERT INTO '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
+    $netsParams = array(
+      1 => array($earmark, 'Integer'),
+      2 => array(1920, 'Integer'),
+      3 => array($contributionId, 'Integer')
+    );        
+  }
+  CRM_Core_DAO::executeQuery($netsSql, $netsParams);
+  /*
+   * update financial type id on contribution based on earmarking
+   */
+  $finTypeId = _recurring_getFinType($earmark);
+  CRM_Core_DAO::executeQuery('UPDATE civicrm_contribution SET financial_type_id = '
+    . '%1 WHERE id = %2', array(
+    1 => array($finTypeId, 'Integer'),
+    2 => array($contributionId, 'Integer')
+  ));
+}
+
+/**
+ * BOS1312346 function to retrieve earmarking_id from matched activity and
+ * set the values in the nets_transactions custom group
+ * 
+ * @author Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+ * @date 1 Apr 2014
+ * @param int $activityId
+ * @param int $contributionId
+ * @return void
+ */
+function ocr_get_act_earmark($activityId, $contributionId) {
+  if (empty($activityId) || empty($contributionId)) {
+    return '';
   }
   try {
     $kidEarmarkCustomGroup = civicrm_api3('CustomGroup', 'Getsingle', array('name' => 'kid_earmark'));
@@ -777,62 +848,12 @@ function ocr_set_act_earmark($activityId, $contributionId) {
     . 'WHERE entity_id = '.$activityId;
   $daoKidEarmark = CRM_Core_DAO::executeQuery($kidEarmarkSql);
   if ($daoKidEarmark->fetch()) {
-    $netsGroupParams = array(
-      'name'  =>  'nets_transactions',
-      'return'=>  'table_name'
-    );
-    try {
-      $netsGroupTable = civicrm_api3('CustomGroup', 'Getvalue', $netsGroupParams);
-    } catch (CiviCRM_API3_Exception $e) {
-      throw new CiviCRM_API3_Exception('Could not find custom group with name
-        nets_transactions, configuration is incorrect. Error message 
-        from API CustomGroup Getvalue :'.$e->getMessage());
-    }
-    $earMarkingField = _recurring_getNetsField('earmarking');
-    $balanseKontoField = _recurring_getNetsField('balansekonto');
-    /*
-     * check if we already have a nets record for this contribution (we should!)
-     * if so, update else create
-     */
-    $checkSql = 'SELECT COUNT(*) AS countNets, id FROM '.$netsGroupTable.' WHERE entity_id = %1';
-    $checkParams = array(1 => array($contributionId, 'Integer'));
-    $daoCheckNets = CRM_Core_DAO::executeQuery($checkSql, $checkParams);
-    if ($daoCheckNets->fetch()) {
-      if ($daoCheckNets->countNets > 0) {
-        $netsSql = 'UPDATE '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2 WHERE id = %3';
-        $netsParams = array(
-          1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
-          2 => array(1920, 'Integer'),
-          3 => array($daoCheckNets->id, 'Integer')
-        );
-      } else {
-        $netsSql = 'INSERT INTO '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
-        $netsParams = array(
-          1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
-          2 => array(1920, 'Integer'),
-          3 => array($contributionId, 'Integer')
-        );        
-      }
-    } else {
-      $netsSql = 'INSERT INTO '.$netsGroupTable.' SET '.$earMarkingField.' = %1, '.$balanseKontoField.' = %2, entity_id = %3';
-      $netsParams = array(
-        1 => array($daoKidEarmark->$kidEarmarkColumn, 'Integer'),
-        2 => array(1920, 'Integer'),
-        3 => array($contributionId, 'Integer')
-      );        
-    }
-    CRM_Core_DAO::executeQuery($netsSql, $netsParams);
-    /*
-     * update financial type id on contribution based on earmarking
-     */
-    $finTypeId = _recurring_getFinType($daoKidEarmark->$kidEarmarkColumn);
-    CRM_Core_DAO::executeQuery('UPDATE civicrm_contribution SET financial_type_id = '
-      . '%1 WHERE id = %2', array(
-      1 => array($finTypeId, 'Integer'),
-      2 => array($contributionId, 'Integer')
-    ));
+    $daoKidEarmark->$kidEarmarkColumn;
   }
+  
+  return '';
 }
+
 /**
 * Function to create the insert or update query for contribution/activity
 * (BOS1406389)
