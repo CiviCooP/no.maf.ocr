@@ -387,6 +387,9 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
       if (empty($aksjon_id) && !empty($activity_id)) {
         $aksjon_id = CRM_Core_DAO::singleValueQuery("SELECT aksjon_id_38 FROM civicrm_value_maf_norway_aksjon_import_1578 WHERE entity_id = %1", array(1 => array($activity_id, 'Positive')));
       }
+      if (empty($kid['earmarking']) && !empty($activity_id)) {
+        $kid['earmarking'] = CRM_Core_DAO::singleValueQuery("SELECT _remerking_98 FROM civicrm_value_kid_earmark_1591 WHERE entity_id = %1", array(1 => array($activity_id, 'Positive')));
+      }
 
       // payment instrument check - this will fail on circle dev server, as payment instruments not present
       // we should not see this warning in production
