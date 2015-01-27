@@ -24,6 +24,8 @@ if (!defined('MAF_DONORJOURNEY_GROUP')) {
   define('MAF_DONORJOURNEY_GROUP', 6509);
 }
 
+$passPostContributionHook = false;
+
 // Include civicrm_api3 wrapper for early 4.3 versions
 if (!class_exists('CiviCRM_API3_Exception')) {
     
@@ -67,6 +69,8 @@ if (!function_exists('civicrm_api3')) {
  * Implementation of hook_civicrm_buildForm
  */
 function ocr_civicrm_buildForm($formName, &$form) {
+  global $passPostContributionHook;
+
   switch ($formName) {
     // Add activity selection list to add/edit Contribution form
     case 'CRM_Contribute_Form_Contribution':
@@ -91,6 +95,7 @@ function ocr_civicrm_buildForm($formName, &$form) {
       if (!empty($defaults)) {
         $form->setDefaults($defaults);
       }
+      $passPostContributionHook = true;
       break;
 
     // Add custom css to the Import Preview and Summary form
@@ -314,7 +319,7 @@ function ocr_civicrm_pageRun(&$page) {
  * Implementation of hook_civicrm_post()
  */
 function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
-
+  global $passPostContributionHook;
   /*
    * BOS1405148
    * set default activity for contribution when status is set
@@ -324,6 +329,10 @@ function ocr_civicrm_post($op, $objectName, $objectId, &$objectRef) {
    * Delete record in contribution_activity when contribution is deleted
    */
   if ($objectName == 'Contribution') {
+    if ($op == 'create' && !$passPostContributionHook) {
+      $donor_group = ocr_get_contribution_donorgroup(0, NULL, $objectRef->contact_id);
+      ocr_create_contribution_donorgroup($objectId, $donor_group);
+    }
     if ($op == 'delete' && !empty($objectId)) {
       $delActQuery = 'DELETE FROM civicrm_contribution_activity WHERE contribution_id = %1';
       $delParams = array(1 => array($objectId, 'Positive'));
