@@ -351,10 +351,11 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
       //if contact ID is not set try to retrieve it from the linked entity (Activity)
       if (empty($contact_id) && ($kid['entity'] == 'Activity' || $kid['entity'] == 'ActivityTarget')) {
         $contact_id = CRM_Core_DAO::singleValueQuery("
-               SELECT target_contact_id FROM civicrm_activity_target
-               WHERE activity_id = %1 and target_contact_id = %2", array(
-              1 => array($kid['entity_id'], 'Positive'),
-              2 => array($kid['contact_id'], 'Positive'),
+               SELECT contact_id FROM civicrm_activity_contact
+               WHERE record_type_id = %1 AND activity_id = %2 AND contact_id = %3", array(
+              1 => array(3, 'Positive'),
+              2 => array($kid['entity_id'], 'Positive'),
+              3 => array($kid['contact_id'], 'Positive'),
         ));
       }
 
@@ -618,10 +619,11 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
 
         // get target contact id for the activity (does not support multiple targets)
         if (!$contact_id = CRM_Core_DAO::singleValueQuery("
-            SELECT target_contact_id FROM civicrm_activity_target
-             WHERE activity_id = %1
+            SELECT contact_id FROM civicrm_activity_contact
+             WHERE activity_id = %1 AND record_type_id = %2
         ", array(
-              1 => array($activity['id'], 'Positive')
+              1 => array($activity['id'], 'Positive'),
+              2 => array(3, 'Positive'),
            )
         )) {
             

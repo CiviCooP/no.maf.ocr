@@ -486,10 +486,16 @@ function ocr_get_latest_activity($contactId) {
   if (empty($contactId)) {
     return $activityId;
   }
-  $query = 'SELECT a.id FROM civicrm_activity a INNER JOIN civicrm_activity_target b '
-    . 'ON a.id = b.activity_id WHERE target_contact_id = %1 AND is_current_revision = 1 '
-    . ' AND activity_type_id != 6 ORDER BY activity_date_time DESC';
-  $params = array(1 => array($contactId, 'Positive'));
+  $query = '
+SELECT a.id FROM civicrm_activity a
+INNER JOIN civicrm_activity_contact b ON a.id = b.activity_id AND record_type_id = %1
+WHERE b.contact_id = %2 AND is_current_revision = %3 AND activity_type_id != %4
+ORDER BY activity_date_time DESC';
+  $params = array(
+    1 => array(3, 'Positive'),
+    2 => array($contactId, 'Positive'),
+    3 => array(1, 'Positive'),
+    4 => array(6, 'Positive'));
   $dao = CRM_Core_DAO::executeQuery($query, $params);
   if ($dao->fetch()) {
     $activityId = $dao->id;
@@ -596,12 +602,15 @@ function ocr_get_activities_for_contact($contact_id) {
   $dao = CRM_Core_DAO::executeQuery("
     SELECT a.id, a.subject, a.activity_date_time, ov.label AS activity_type 
     FROM civicrm_activity a
-    INNER JOIN civicrm_activity_target at ON at.activity_id = a.id
-    LEFT JOIN civicrm_option_value ov ON a.activity_type_id = ov.value AND option_group_id = 2
-    WHERE at.target_contact_id = %1
+    INNER JOIN civicrm_activity_contact ac ON ac.activity_id = a.id AND ac.record_type_id = %1
+    LEFT JOIN civicrm_option_value ov ON a.activity_type_id = ov.value AND option_group_id = %2
+    WHERE ac.contact_id = %3
     ORDER BY a.activity_date_time
     ", array(
-      1 => array($contact_id, 'Positive')));
+      1 => array(3, 'Positive'),
+      2 => array(2, 'Positive'),
+      3 => array($contact_id, 'Positive'),
+    ));
     while ($dao->fetch()) {
       $activities[$dao->id] = $dao->activity_type. ' - '.$dao->subject . ' - ' . 
         date('d-m-Y', strtotime($dao->activity_date_time));
