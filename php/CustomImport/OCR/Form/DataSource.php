@@ -71,6 +71,10 @@ class CustomImport_OCR_Form_DataSource extends CRM_Core_Form {
         } else {
             $this->assign('showOnlyDataSourceFormPane', true);
         }
+
+        if (!$this->_dataSource) {
+          $this->_dataSource = 'CRM_Import_DataSource_OCR';
+        }
         
         if (strpos($this->_dataSource, 'CRM_Import_DataSource_') === 0) {
             

@@ -19,7 +19,7 @@
  * Data extraction class for OCR Files
  */
 
-class CRM_Import_DataSource_OCR extends CRM_Import_DataSource {
+class CRM_Import_DataSource_OCR extends CRM_MAFOCR_DataSource {
     
     public static $line;
     protected static $line_no;
@@ -63,7 +63,7 @@ class CRM_Import_DataSource_OCR extends CRM_Import_DataSource {
         //$this->set('originalColHeader', CRM_Utils_Array::value('original_col_header', $result));
 
         $table = $result['import_table_name'];
-        $importJob = new CRM_Import_ImportJob($table);
+        $importJob = new CRM_MAFOCR_ImportJob($table);
         $this->set('importTableName', $importJob->getTableName());
     
     }
