@@ -25,7 +25,12 @@ class CustomExport_OCR_Export_Form extends CRM_Core_Form {
         $date->modify('+14 day'); // = 15th of next month
         $defaults['start_date'] = $date->format('c');
 
-        $date->modify('+1 month'); // = 15th of the month after
+        /*
+         * Erik Hommel (CiviCooP) - remarks from CiviCRM 4.4.12 upgrade:
+         * second date should be the 14th of the next month, not 15th
+         */
+        $date->modify('+1 month -1 day');
+
         $defaults['end_date'] = $date->format('c');
 
         list($defaults['start_date'], $defaults['start_date_time']) 

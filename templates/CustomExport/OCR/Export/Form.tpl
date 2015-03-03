@@ -1,7 +1,7 @@
 <div class="crm-block crm-form-block crm-event-ticket-form-block">
   <div class="view-content">
 	<div id="help">
-	  {ts}This will generate an OCR file of payments pending between the specified start and end dates. The default is from the 15th of next month to the 15th of the following month.{/ts}
+	  {ts}This will generate an OCR file of payments pending between the specified start and end dates. The default is from the 15th of next month to the 14th of the following month.{/ts}
 	</div>
   </div>
   <table class="form-layout" style="margin:10px 0 10px 0; border-top:1px solid #ccc; border-bottom:1px solid #ccc;">
