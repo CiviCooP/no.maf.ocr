@@ -1,6 +1,6 @@
 {*
  +--------------------------------------------------------------------+
- | CiviCRM version 4.3                                                |
+ | CiviCRM version 4.4                                                |
  +--------------------------------------------------------------------+
  | Copyright CiviCRM LLC (c) 2004-2013                                |
  +--------------------------------------------------------------------+
@@ -22,8 +22,14 @@
  | GNU Affero General Public License or the licensing of CiviCRM,     |
  | see the CiviCRM license FAQ at http://civicrm.org/licensing        |
  +--------------------------------------------------------------------+
- | BOS1405148 rename group to Linked Activity  (5 Jun 2014)           |
+ | BOS1405148 rename group to Linked Activity (5 Jun 2014)            |
  | Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>                  |
+ |                                                                    |
+ | BOS15031121 Soft credit not visible after upgrade (27 Mar 2015)    |
+ | Jaap Jansma (CiviCooP) <jaap.jansma@civicoop.org>                  |
+ | I have taken the template of civi 4.4 and applied the changes      |
+ | made in the version of v.3                                         |
+ |                                                                    |
  +--------------------------------------------------------------------+
 *}
 {* this template is used for adding/editing/deleting contributions and pledge payments *}
@@ -91,7 +97,8 @@
       {if !$contributionMode and !$email and $outBound_option != 2}
         {assign var='profileCreateCallback' value=1 }
       {/if}
-      {include file="CRM/Contact/Form/NewContact.tpl"}
+      {* note that if we are using multiple instances of NewContact always pass values for blockNo and prefix *}
+      {include file="CRM/Contact/Form/NewContact.tpl" blockNo=1 prefix=''}
     {/if}
     {if $contributionMode}
     <tr class="crm-contribution-form-block-payment_processor_id"><td class="label nowrap">{$form.payment_processor_id.label}<span class="marker"> * </span></td><td>{$form.payment_processor_id.html}</td></tr>
@@ -104,16 +111,16 @@
       </td>
     </tr>
 
-    {* BOS1312346 *}
-    <tr class="crm-contribution-form-block">
-        <td class="label">{$form.earmarking_id.label}</td>
-        <td>{$form.earmarking_id.html}</td>  
-    </tr>
-    <tr class="crm-contribution-form-block">
-        <td class="label">{$form.balansekonto_id.label}</td>
-        <td>{$form.balansekonto_id.html}</td>  
-    </tr>
-    {* end BOS1312346 *}
+      {* BOS1312346 *}
+      <tr class="crm-contribution-form-block">
+          <td class="label">{$form.earmarking_id.label}</td>
+          <td>{$form.earmarking_id.html}</td>
+      </tr>
+      <tr class="crm-contribution-form-block">
+          <td class="label">{$form.balansekonto_id.label}</td>
+          <td>{$form.balansekonto_id.html}</td>
+      </tr>
+      {* end BOS1312346 *}
 
     {if $action eq 2 and $lineItem and !$defaultContribution}
     <tr>
@@ -234,44 +241,69 @@
         </td>
       </tr>
     {/if}
-  <tr id="softCreditID" class="crm-contribution-form-block-soft_credit_to"><td class="label">{$form.soft_credit_to.label}</td>
-    <td {$valueStyle}>
-      {$form.soft_credit_to.html} {help id="id-soft_credit"}
-      {if $siteHasPCPs}
-        <div id="showPCPLink"><a href='#' onclick='showPCP(); return false;'>{ts}credit this contribution to a personal campaign page{/ts}</a>{help id="id-link_pcp"}</div>
-      {/if}
-    </td>
-  </tr>
-    {if $siteHasPCPs}{* Credit contribution to PCP. *}
-    <tr id="pcpID" class="crm-contribution-form-block-pcp_made_through_id">
-      <td class="label">{$form.pcp_made_through.label}</td>
-      <td>
-        {$form.pcp_made_through.html} &nbsp;
-        <span class="showSoftCreditLink">{ts}<a href="#" onclick='showSoftCredit(); return false;'>unlink from personal campaign page</a>{/ts}</span><br />
-        <span class="description">{ts}Search for the Personal Campaign Page by the fund-raiser's last name or email address.{/ts}</span>
-        <div class="spacer"></div>
-        <div class="crm-contribution-form-block-pcp_details">
-          <table class="crm-contribution-form-table-credit_to_pcp">
-            <tr id="pcpDisplayRollID" class="crm-contribution-form-block-pcp_display_in_roll"><td class="label">{$form.pcp_display_in_roll.label}</td>
-              <td>{$form.pcp_display_in_roll.html}</td>
-            </tr>
-            <tr id="nickID" class="crm-contribution-form-block-pcp_roll_nickname">
-              <td class="label">{$form.pcp_roll_nickname.label}</td>
-              <td>{$form.pcp_roll_nickname.html|crmAddClass:big}<br />
-                <span class="description">{ts}Name or nickname contributor wants to be displayed in the Honor Roll. Enter "Anonymous" for anonymous contributions.{/ts}</span></td>
-            </tr>
-            <tr id="personalNoteID" class="crm-contribution-form-block-pcp_personal_note">
-              <td class="label" style="vertical-align: top">{$form.pcp_personal_note.label}</td>
-              <td>{$form.pcp_personal_note.html}
-                <span class="description">{ts}Personal message submitted by contributor for display in the Honor Roll.{/ts}</span>
+
+  </table>
+    <!-- start of soft credit -->
+    <div class="crm-accordion-wrapper crm-accordion_title-accordion crm-accordion-processed" id="softCredit">
+      <div class="crm-accordion-header">
+        {ts}Soft Credit{/ts}&nbsp;{help id="id-soft_credit"}
+      </div>
+      <div class="crm-accordion-body">
+        <table class="form-layout-compressed">
+          {if $siteHasPCPs}
+            <tr class="crm-contribution-pcp-block-link">
+              <td colspan="2">
+                <div id="showPCP">
+                  <a href='#'>{ts}credit this contribution to a personal campaign page{/ts}</a>
+                </div>
               </td>
             </tr>
-          </table>
-        </div>
-      </td>
-    </tr>
-    {/if}
-  </table>
+            <tr class="crm-contribution-pcp-block crm-contribution-form-block-pcp_made_through_id hiddenElement">
+              <td class="label">{$form.pcp_made_through.label}</td>
+              <td>
+                {$form.pcp_made_through.html} &nbsp;
+                <span class="showSoftCreditLink">
+                  <a href="#" id="showSoftCredit">{ts}unlink from personal campaign page{/ts}</a>
+                </span><br/>
+                <span class="description">{ts}Search for the Personal Campaign Page by the fund-raiser's last name or
+                 email address.{/ts}</span>
+
+                <div class="spacer"></div>
+                <div class="crm-contribution-form-block-pcp_details">
+                  <table class="crm-contribution-form-table-credit_to_pcp">
+                    <tr id="pcpDisplayRollID" class="crm-contribution-form-block-pcp_display_in_roll">
+                      <td class="label">{$form.pcp_display_in_roll.label}</td>
+                      <td>{$form.pcp_display_in_roll.html}</td>
+                    </tr>
+                    <tr id="nickID" class="crm-contribution-form-block-pcp_roll_nickname">
+                      <td class="label">{$form.pcp_roll_nickname.label}</td>
+                      <td>{$form.pcp_roll_nickname.html|crmAddClass:big}<br/>
+                        <span class="description">{ts}Name or nickname contributor wants to be displayed in the Honor
+                      Roll. Enter "Anonymous" for anonymous contributions.{/ts}</span>
+                      </td>
+                    </tr>
+                    <tr id="personalNoteID" class="crm-contribution-form-block-pcp_personal_note">
+                      <td class="label" style="vertical-align: top">{$form.pcp_personal_note.label}</td>
+                      <td>
+                        {$form.pcp_personal_note.html}
+                        <span
+                          class="description">{ts}Personal message submitted by contributor for display in the Honor Roll.{/ts}</span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          {/if}
+          <tr class="crm-contribution-form-block-soft_credit_to">
+            <td colspan="2">
+              {include file="CRM/Contribute/Form/SoftCredit.tpl"}
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <!-- end of soft credit -->
     {if !$contributionMode}
     <div class="crm-accordion-wrapper crm-accordion_title-accordion crm-accordion-processed" id="paymentDetails_Information">
       <div class="crm-accordion-header">
@@ -287,8 +319,7 @@
           </tr>
           <tr class="crm-contribution-form-block-payment_instrument_id">
             <td class="label">{$form.payment_instrument_id.label}</td>
-            <td {$valueStyle}>{$form.payment_instrument_id.html}<br />
-              <span class="description">{ts}Leave blank for non-monetary contributions.{/ts}</span>
+            <td {$valueStyle}>{$form.payment_instrument_id.html} {help id="payment_instrument_id"}</td>
             </td>
           </tr>
           {if $showCheckNumber || !$isOnline}
@@ -330,35 +361,35 @@
     </div>
     {/if}
 
-  {* Customized - andyw@circle, 01/10/2013 *}
-  {* Provide fieldset for linking to Activity - OCR Import/Export extension *}
-  
-    <div class="crm-accordion-wrapper crm-accordion_title-accordion crm-accordion-processed" id="paymentDetails_Information">
-      <div class="crm-accordion-header">
-        {* BOS1405148 - Erik Hommel (CiviCooP - <erik.hommel@civicoop.org> change name to Linked Activity and add donor group *}  
-        {*{ts}OCR Import/Export{/ts}*}
-        {ts}Linked Activity and Donor Group{/ts}
-        {* end BOS1405148 *}
-        
+      {* Customized - andyw@circle, 01/10/2013 *}
+      {* Provide fieldset for linking to Activity - OCR Import/Export extension *}
+
+      <div class="crm-accordion-wrapper crm-accordion_title-accordion crm-accordion-processed" id="paymentDetails_Information">
+          <div class="crm-accordion-header">
+              {* BOS1405148 - Erik Hommel (CiviCooP - <erik.hommel@civicoop.org> change name to Linked Activity and add donor group *}
+              {*{ts}OCR Import/Export{/ts}*}
+              {ts}Linked Activity and Donor Group{/ts}
+              {* end BOS1405148 *}
+
+          </div>
+          <div class="crm-accordion-body">
+              <table class="form-layout-compressed">
+                  <tr>
+                      <td class="label">{$form.ocr_activity.label}</td>
+                      <td>{$form.ocr_activity.html}</td>
+                  </tr>
+
+                  {* BOS1405148 - add donor group *}
+                  <tr>
+                      <td class="label">{$form.donor_group.label}</td>
+                      <td>{$form.donor_group.html}</td>
+                  </tr>
+
+              </table>
+              {$form.ocr_contact_id.html}
+          </div>
       </div>
-      <div class="crm-accordion-body">
-        <table class="form-layout-compressed">
-          <tr>
-            <td class="label">{$form.ocr_activity.label}</td>
-            <td>{$form.ocr_activity.html}</td>
-          </tr>
-          
-          {* BOS1405148 - add donor group *}
-          <tr>
-            <td class="label">{$form.donor_group.label}</td>
-            <td>{$form.donor_group.html}</td>
-          </tr>
-          
-        </table>
-        {$form.ocr_contact_id.html}
-      </div>
-    </div>
-  {* End of customization *}
+      {* End of customization *}
 
   <div id="customData" class="crm-contribution-form-block-customData"></div>
 
@@ -373,6 +404,8 @@
     {if $customDataSubType}
       CRM.buildCustomData( '{$customDataType}', {$customDataSubType} );
     {/if}
+
+    {if $buildPriceSet}{literal}buildAmount( );{/literal}{/if}
     {literal}
     });
 
@@ -410,10 +443,6 @@
 
   var url = "{/literal}{$dataUrl}{literal}";
 
-  cj('#soft_credit_to').autocomplete( url, { width : 180, selectFirst : false, matchContains: true
-  }).result( function(event, data, formatted) {
-      cj( "#soft_contact_id" ).val( data[1] );
-  });
   {/literal}
     {if $context eq 'standalone' and $outBound_option != 2 }
       {literal}
@@ -487,7 +516,7 @@
       }
     }
   }
-  
+
   function status() {
     cj("#cancel_date").val('');
     cj("#cancel_reason").val('');
@@ -519,8 +548,8 @@
 
     {/literal}{if !$contributionMode}{literal}
      cj( function( ) {
-      showHideCancelInfo(cj('#contribution_status_id'));	
-      
+      showHideCancelInfo(cj('#contribution_status_id'));
+
       cj('#contribution_status_id').change(function() {
        showHideCancelInfo(this);
       }
@@ -533,13 +562,13 @@
          cj('#cancelInfo').show( );
        }
        else {
-       	 status();          
+          status();
          cj('#cancelInfo').hide( );
        }
      }
 
     {/literal}{/if}{literal}
-    </script>	
+    </script>
     {/literal}
       {if !$contributionMode}
         {include file="CRM/common/showHideByFieldValue.tpl"
@@ -568,42 +597,6 @@ cj(function() {
 
 // load form during form rule.
 {if $buildPriceSet}{literal}buildAmount( );{/literal}{/if}
-
-{if $siteHasPCPs}
-  {literal}
-  var pcpUrl = "{/literal}{$pcpDataUrl}{literal}";
-
-  cj('#pcp_made_through').autocomplete( pcpUrl, { width : 360, selectFirst : false, matchContains: true
-  }).result( function(event, data, formatted) {
-      cj( "#pcp_made_through_id" ).val( data[1] );
-  });
-{/literal}
-
-  {if $pcpLinked}
-    {literal}hideSoftCredit( );{/literal}{* hide soft credit on load if we have PCP linkage *}
-  {else}
-    {literal}cj('#pcpID').hide();{/literal}{* hide PCP section *}
-  {/if}
-
-  {literal}
-  function hideSoftCredit ( ){
-    cj("#softCreditID").hide();
-  }
-  function showPCP( ) {
-    cj('#pcpID').show();
-    cj("#softCreditID").hide();
-  }
-  function showSoftCredit( ) {
-    cj('#pcp_made_through_id').val('');
-    cj('#pcp_made_through').val('');
-    cj('#pcp_roll_nickname').val('');
-    cj('#pcp_personal_note').val('');
-    cj('#pcp_display_in_roll').attr('checked', false);
-    cj("#pcpID").hide();
-    cj('#softCreditID').show();
-  }
-  {/literal}
-{/if}
 
 {literal}
 function buildAmount( priceSetId ) {
@@ -676,7 +669,7 @@ function showStartDate( ) {
 {/literal}{/if}{literal}
 cj('#fee_amount').change( function() {
   var totalAmount = cj('#total_amount').val();
-  var feeAmount = cj('#fee_amount').val();  
+  var feeAmount = cj('#fee_amount').val();
   var netAmount = totalAmount.replace(/,/g, '') - feeAmount.replace(/,/g, '');
   if (!cj('#net_amount').val()) {
     cj('#net_amount').val(netAmount);
