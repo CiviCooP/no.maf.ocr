@@ -30,11 +30,31 @@ $passPostContributionHook = false;
  * Implementation of hook_civicrm_buildForm
  */
 function ocr_civicrm_buildForm($formName, &$form) {
+
   global $passPostContributionHook;
 
   switch ($formName) {
     // Add activity selection list to add/edit Contribution form
     case 'CRM_Contribute_Form_Contribution':
+
+      /*
+       * BOS1506824 hack to allow edit of net and fee amount for recurring because recurring id is stored in $form->_online for same strange reason
+       * Erik Hommel (CiviCooP) <erik.hommel@civicoop.org>
+       */
+      $formType = $form->getVar('_formType');
+      if ($formType == "AdditionalDetail") {
+        if (isset($form->_values['contribution_recur_id'])) {
+          if ($form->_online == $form->_values['contribution_recur_id']) {
+            $elementIndex = $form->_elementIndex['net_amount'];
+            $netAmount = $form->_elements[$elementIndex];
+            $netAmount->unfreeze();
+            $elementIndex = $form->_elementIndex['fee_amount'];
+            $feeAmount = $form->_elements[$elementIndex];
+            $feeAmount->unfreeze();
+          }
+        }
+      }
+
       $contact_id      = @$_POST['contact_id'] or $contact_id = @$_GET['cid'];
       $contribution_id = @$_GET['id'];
    
@@ -53,6 +73,7 @@ function ocr_civicrm_buildForm($formName, &$form) {
        * set defaults for donor_group and linked activity
        */
       $defaults = ocr_set_contribution_enhanced_defaults($contribution_id, $contact_id);
+      //$defaults['net_amount'] = $form->_defaults['total_amount'];
       if (!empty($defaults)) {
         $form->setDefaults($defaults);
       }
@@ -82,6 +103,7 @@ function ocr_set_contribution_enhanced_defaults($contributionId, $contactId) {
   $defaults = array();
   ocr_set_default_contribution_activity($contributionId, $defaults, $contactId);
   ocr_set_default_contribution_donorgroup($contributionId, $defaults, $contactId);
+
   return $defaults;
 }
 /**
