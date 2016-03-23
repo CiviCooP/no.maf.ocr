@@ -390,7 +390,7 @@ function ocr_get_contribution_donorgroup($contributionId, $receiveDate, $contact
   /*
    * get all groups for contact
    */
-  $contactGroups = CRM_Contact_BAO_GroupContact::getContactGroup($contactId);
+  $contactGroups = CRM_Contact_BAO_GroupContact::getContactGroup($contactId, 'Added', NULL, FALSE, TRUE);
   foreach ($contactGroups as $contactGroup) {
     /*
      * if group is donor journey group, check if active on receive date
