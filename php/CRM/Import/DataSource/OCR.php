@@ -275,7 +275,14 @@ class CRM_Import_DataSource_OCR extends CRM_MAFOCR_DataSource {
                                 $notificationBank = "No";
                                 break;
                         }
-                        $donorNumber = trim($getChars(27, 32));
+                        /*
+                         * Issue #890: Lookup donor number by KID
+                         */
+                        $kid = trim($getChars(27, 32));
+                        $donorNumber = CRM_Core_DAO::singleValueQuery("SELECT entity_id FROM civicrm_value_kid_base WHERE kid_base = '".$kid."'");
+                        if (!$donorNumber) {
+                          $donorNumber = $kid;
+                        }
                         /*
                          * create weekly record
                          */
