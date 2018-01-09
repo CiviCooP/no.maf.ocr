@@ -510,10 +510,22 @@ class CustomImport_Parser_OCRFile extends CustomImport_Parser_Custom {
          * BOS1405148 add contribution/activity and contribution/donor group
          * based on contact and receive_date
          */
-        $latestActivityId = ocr_get_latest_activity($contribution['contact_id']);
-        ocr_create_contribution_activity($contribution['id'], $latestActivityId);
-        $donorGroupId = ocr_get_contribution_donorgroup($contribution['id'], $contribution['receive_date'], $contribution['contact_id']);
-        ocr_create_contribution_donorgroup($contribution['id'], $donorGroupId);
+ 				try {
+        	$latestActivityId = ocr_get_latest_activity($contribution['contact_id']);
+        	ocr_create_contribution_activity($contribution['id'], $latestActivityId);
+        	$donorGroupId = ocr_get_contribution_donorgroup($contribution['id'], $contribution['receive_date'], $contribution['contact_id']);
+        	ocr_create_contribution_donorgroup($contribution['id'], $donorGroupId);
+				} catch (CiviCRM_API3_Exception $e) {
+          $message = ts("Failed setting donor group. (contribution id: %1, KID: '%2', contact: %3) at line %5 with message: %4", array(
+            1 => $contribution['id'],
+          	2 => $record['kid'],
+          	3 => $this->getDisplayName($contribution['contact_id']),
+            4 => $e->getMessage(),
+          	5 => $record['line_no']
+          ));
+          $this->addReportLine('warning', $message);
+          return;
+        }
 
         $this->addReportLine('ok', ts("Successfully completed contribution (id: %1) for KID Number '%2' (%3) at line %4", array(
           1 => $contribution['id'],
